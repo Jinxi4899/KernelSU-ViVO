@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail};
 use goblin::elf::{Elf, section_header, sym::Sym};
+use rustix::system::init_module;
 use scroll::{Pwrite, ctx::SizeWith};
 use std::collections::HashMap;
 use std::ffi::CStr;
@@ -86,8 +87,102 @@ pub fn for_each_kernel_symbols<F: FnMut(&(String, u64)) -> Result<bool>>(mut f: 
     Ok(())
 }
 
+type UndefinedSymbols = HashMap<String, (Sym, usize)>;
+
+fn undefined_symbols(buffer: &[u8]) -> Result<(UndefinedSymbols, goblin::container::Ctx)> {
+    let elf = Elf::parse(buffer)?;
+    let ctx = *elf.syms.ctx();
+    let mut unresolved_symbols = HashMap::new();
+
+    for (index, sym) in elf.syms.iter().enumerate() {
+        if index == 0 || sym.st_shndx != section_header::SHN_UNDEF as usize {
+            continue;
+        }
+
+        let Some(name) = elf.strtab.get_at(sym.st_name) else {
+            continue;
+        };
+        let offset = elf.syms.offset() + index * Sym::size_with(elf.syms.ctx());
+        unresolved_symbols.insert(name.to_owned(), (sym, offset));
+    }
+
+    Ok((unresolved_symbols, ctx))
+}
+
+fn bind_symbol(
+    buffer: &mut [u8],
+    (mut sym, offset): (Sym, usize),
+    addr: u64,
+    ctx: goblin::container::Ctx,
+) -> Result<()> {
+    sym.st_shndx = section_header::SHN_ABS as usize;
+    sym.st_value = addr;
+    buffer.pwrite_with(sym, offset, ctx)?;
+    Ok(())
+}
+
+pub fn resolve_kallsyms(names: &[&str]) -> Result<Vec<Option<u64>>> {
+    let mut addrs = vec![None; names.len()];
+    let mut pending: HashMap<&str, usize> = names
+        .iter()
+        .enumerate()
+        .map(|(index, name)| (*name, index))
+        .collect();
+
+    if !pending.is_empty() {
+        for_each_kernel_symbols(|(symbol, addr)| {
+            if let Some(index) = pending.remove(symbol.as_str()) {
+                addrs[index] = Some(*addr);
+            }
+            Ok(!pending.is_empty())
+        })
+        .context("Cannot parse kallsyms")?;
+    }
+
+    Ok(addrs)
+}
+
+fn resolve_module_symbols<F>(data: &[u8], resolve: F) -> Result<Vec<u8>>
+where
+    F: FnOnce(&[&str]) -> Result<Vec<Option<u64>>>,
+{
+    let mut buffer = data.to_vec();
+    let (unresolved_symbols, ctx) = undefined_symbols(&buffer)?;
+
+    if unresolved_symbols.is_empty() {
+        return Ok(buffer);
+    }
+
+    let names: Vec<&str> = unresolved_symbols.keys().map(String::as_str).collect();
+    let addrs = resolve(&names).context("Cannot resolve symbols")?;
+    if addrs.len() != names.len() {
+        bail!(
+            "Resolver returned {} addresses for {} symbols",
+            addrs.len(),
+            names.len()
+        );
+    }
+
+    for (name, addr) in names.iter().zip(addrs) {
+        match addr {
+            Some(addr) => bind_symbol(&mut buffer, unresolved_symbols[*name], addr, ctx)?,
+            None => log::warn!("Cannot find symbol: {}", name),
+        }
+    }
+
+    Ok(buffer)
+}
+
 pub fn load_module(data: &[u8], params: &CStr) -> Result<()> {
-    load_module_inner(data, "module", None, params)
+    load_module_with_resolver(data, params, resolve_kallsyms)
+}
+
+pub fn load_module_with_resolver<F>(data: &[u8], params: &CStr, resolve: F) -> Result<()>
+where
+    F: FnOnce(&[&str]) -> Result<Vec<Option<u64>>>,
+{
+    let buffer = resolve_module_symbols(data, resolve)?;
+    init_module_buffer(buffer, "module", None, params)
 }
 
 pub fn load_module_with_vermagic_fallback(
@@ -118,45 +213,16 @@ fn load_module_inner(
     fallback: Option<(&[u8], &str)>,
     params: &CStr,
 ) -> Result<()> {
-    let mut buffer = data.to_vec();
-    let elf = Elf::parse(&buffer)?;
-    let ctx = *elf.syms.ctx();
+    let buffer = resolve_module_symbols(data, resolve_kallsyms)?;
+    init_module_buffer(buffer, module_name, fallback, params)
+}
 
-    let mut unresolved_symbols: HashMap<String, (Sym, usize)> = HashMap::new();
-    for (index, sym) in elf.syms.iter().enumerate() {
-        if index == 0 {
-            continue;
-        }
-
-        if sym.st_shndx != section_header::SHN_UNDEF as usize {
-            continue;
-        }
-
-        let Some(name) = elf.strtab.get_at(sym.st_name) else {
-            continue;
-        };
-
-        let offset = elf.syms.offset() + index * Sym::size_with(elf.syms.ctx());
-        unresolved_symbols.insert(name.to_owned(), (sym, offset));
-    }
-
-    if !unresolved_symbols.is_empty() {
-        for_each_kernel_symbols(|(symbol, addr)| {
-            if let Some((mut sym, offset)) = unresolved_symbols.remove(symbol) {
-                sym.st_shndx = section_header::SHN_ABS as usize;
-                sym.st_value = *addr;
-                buffer.pwrite_with(sym, offset, ctx)?;
-            }
-
-            Ok(!unresolved_symbols.is_empty())
-        })
-        .context("Cannot parse kallsyms")?;
-    }
-
-    for name in unresolved_symbols.keys() {
-        log::warn!("Cannot find symbol: {}", name);
-    }
-
+fn init_module_buffer(
+    mut buffer: Vec<u8>,
+    module_name: &str,
+    fallback: Option<(&[u8], &str)>,
+    params: &CStr,
+) -> Result<()> {
     let mut kmsg = match open_kmsg_at_end() {
         Ok(file) => Some(file),
         Err(error) => {
@@ -165,7 +231,7 @@ fn load_module_inner(
         }
     };
 
-    match do_init_module(&buffer, params) {
+    match init_module(&buffer, params) {
         Ok(()) => Ok(()),
         Err(first_error) => {
             log::warn!(
@@ -173,25 +239,17 @@ fn load_module_inner(
                 module_name,
                 first_error
             );
-
             let logs = match kmsg.as_mut() {
                 Some(file) => read_new_kmsg(file).unwrap_or_default(),
                 None => String::new(),
             };
-
             let Some(required_vermagic) = extract_required_vermagic(&logs) else {
                 log::error!(
                     "init_module failed without a version-magic mismatch. Kernel log:\n{}",
                     logs
                 );
-                return Err(anyhow::anyhow!("init_module failed: {:?}", first_error));
+                return Err(first_error).context("init_module failed without vermagic mismatch");
             };
-
-            log::warn!(
-                "Kernel requires vermagic {:?} while loading {}",
-                required_vermagic,
-                module_name
-            );
 
             if let Some((fallback_data, fallback_name)) = fallback {
                 log::warn!(
@@ -201,11 +259,6 @@ fn load_module_inner(
                 );
                 load_module_inner(fallback_data, fallback_name, None, params)
                     .with_context(|| format!("Fallback module load failed for {fallback_name}"))?;
-                log::info!(
-                    "Fallback module {} loaded successfully after {} vermagic mismatch",
-                    fallback_name,
-                    module_name
-                );
                 return Ok(());
             }
 
@@ -215,29 +268,10 @@ fn load_module_inner(
             );
             replace_module_vermagic(&mut buffer, &required_vermagic)
                 .context("Cannot replace module vermagic")?;
-
-            do_init_module(&buffer, params).map_err(|error| {
-                anyhow::anyhow!("init_module failed after replacing vermagic: {:?}", error)
-            })?;
-            log::info!(
-                "Loaded {} successfully after in-place vermagic replacement",
-                module_name
-            );
+            init_module(&buffer, params).context("init_module failed after replacing vermagic")?;
             Ok(())
         }
     }
-}
-
-fn do_init_module(buffer: &[u8], params: &CStr) -> std::result::Result<(), syscalls::Errno> {
-    unsafe {
-        syscall!(
-            Sysno::init_module,
-            buffer.as_ptr(),
-            buffer.len(),
-            params.as_ptr()
-        )
-    }
-    .map(|_| ())
 }
 
 #[cfg(unix)]
