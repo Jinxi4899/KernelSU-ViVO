@@ -44,6 +44,13 @@ jobs:
     steps:
     - name: Checkout source code
       uses: actions/checkout@v7
+      with:
+        # Full history so kernel/Kbuild can compute KSU_VERSION = 30000 + commit count,
+        # matching the manager APK versionCode (30000 + git rev-list --count HEAD).
+        # With the default depth=1 the count would be 1 (or the Kbuild git detection
+        # fails entirely) and the module falls back to the hardcoded version 16,
+        # which makes the manager show "a newer bundled LKM is available" forever.
+        fetch-depth: 0
 
     - name: Inject vivo vermagic
       if: ${{ inputs.vivo }}
@@ -99,7 +106,12 @@ jobs:
         EXPECTED_SIZE: ${{ inputs.expected_size }}
         EXPECTED_HASH: ${{ inputs.expected_hash }}
       run: |
-        git config --global --add safe.directory /__w/KernelSU/KernelSU
+        # NOTE: do NOT hardcode /__w/KernelSU/KernelSU here. The container workspace
+        # path is /__w/<repo-name>/<repo-name>, which for this fork is
+        # /__w/KernelSU-ViVO/KernelSU-ViVO. With the wrong path git still fails with
+        # "dubious ownership", kernel/Kbuild cannot detect the git repo and the module
+        # is built with the fallback -DKSU_VERSION=16.
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
         cd kernel
 
