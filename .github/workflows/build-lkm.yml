@@ -8,12 +8,12 @@ on:
         default: ''
         type: string
       expected_size:
-        description: 'expected signature size'
+        description: 'Expected Manager signature size'
         required: false
         default: ''
         type: string
       expected_hash:
-        description: 'expected signature hash'
+        description: 'Expected Manager signature hash'
         required: false
         default: ''
         type: string
