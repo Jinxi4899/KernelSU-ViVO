@@ -27,6 +27,7 @@ kernelsu-objs += infra/event_queue.o
 kernelsu-objs += infra/seccomp_cache.o
 kernelsu-objs += infra/su_mount_ns.o
 kernelsu-objs += infra/symbol_resolver.o
+kernelsu-objs += infra/btf_parser.o
 
 ifneq ($(CONFIG_KSU_DISABLE_MANAGER),y)
 kernelsu-objs += manager/apk_sign.o
@@ -44,6 +45,7 @@ kernelsu-objs += runtime/ksud_integration.o
 kernelsu-objs += selinux/selinux.o
 kernelsu-objs += selinux/rules.o
 kernelsu-objs += selinux/sepolicy.o
+kernelsu-objs += selinux/inode.o
 
 kernelsu-objs += sulog/event.o
 kernelsu-objs += sulog/fd.o

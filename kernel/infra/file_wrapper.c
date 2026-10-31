@@ -538,10 +538,13 @@ int ksu_install_file_wrapper(int fd)
     struct inode *wrapper_inode = file_inode(wrapper_file);
     // libc's stdio relies on the fstat() result of the fd to determine its buffer type.
     wrapper_inode->i_mode = file_inode(orig_file)->i_mode;
-    struct inode_security_struct *wrapper_sec = selinux_inode(wrapper_inode);
+    // ksu_selinux_inode() reads the blob offset from vmlinux BTF on LKM
+    // builds (6.6 LTS moved lbs_inode in lsm_blob_sizes) and verifies the
+    // blob back-reference; NULL/ERR_PTR means "leave the label alone".
+    struct inode_security_struct *wrapper_sec = ksu_selinux_inode(wrapper_inode);
     // Use ksu_file_sid to bypass SELinux check.
     // When we call `su` from terminal app, this is useful.
-    if (wrapper_sec) {
+    if (!IS_ERR_OR_NULL(wrapper_sec)) {
         wrapper_sec->sid = ksu_file_sid;
     }
     // Install open file operation for inode.

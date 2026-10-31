@@ -145,6 +145,9 @@ int __init kernelsu_init(void)
     ksu_sulog_init();
     ksu_adb_root_init();
     ksu_lsm_hook_init();
+    // Resolve the SELinux inode blob offset (vmlinux BTF on LKM builds)
+    // before anything that relabels inodes, i.e. ksu_file_wrapper_init().
+    ksu_selinux_inode_init();
     ksu_selinux_hide_init();
     ksu_shell_su_adb_only_init();
 

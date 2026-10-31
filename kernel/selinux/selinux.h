@@ -42,4 +42,19 @@ void escape_to_root_for_adb_root();
 
 extern u32 ksu_file_sid;
 
+/*
+ * Runtime-safe accessors for the SELinux inode security blob.
+ *
+ * On loadable-module builds with CONFIG_DEBUG_INFO_BTF the lbs_inode offset
+ * is read from vmlinux BTF at init time (6.6 LTS moved it in
+ * lsm_blob_sizes), and ksu_selinux_inode() verifies the blob back-reference
+ * before returning it (NULL when absent, ERR_PTR on offset mismatch).
+ * Built-in builds and kernels without BTF fall back to the compile-time
+ * selinux_inode() access, which is correct there by construction.
+ */
+struct inode;
+struct inode_security_struct;
+int __init ksu_selinux_inode_init(void);
+struct inode_security_struct *ksu_selinux_inode(const struct inode *inode);
+
 #endif
