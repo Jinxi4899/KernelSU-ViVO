@@ -1,25 +1,10 @@
 name: Build Manager
 
 on:
+  # Manual builds only: pushes to main do NOT auto-trigger (vivo fork policy).
+  # Run via Actions tab -> Build Manager -> Run workflow when an APK is needed.
+  # The Release workflow (tag push) still calls this via workflow_call.
   workflow_dispatch:
-  push:
-    branches: [ "main", "dev", "ci" ]
-    paths:
-      - '.github/workflows/build-manager.yml'
-      - '.github/workflows/build-lkm.yml'
-      - '.github/workflows/build-lkm-vivo.yml'
-      - '.github/workflows/ddk-lkm.yml'
-      - '.github/workflows/ksud.yml'
-      - '.github/workflows/ksud-extra.yml'
-      - '.github/workflows/ksuinit.yml'
-      - '.github/scripts/setup-rust-build.sh'
-      - '.github/riscv64-cargo.toml'
-      - 'repack_apk.py'
-      - 'manager/**'
-      - 'kernel/**'
-      - 'userspace/**'
-      - 'Cargo.lock'
-      - 'Cargo.toml'
   pull_request:
     branches: [ "main", "dev" ]
     paths:
@@ -236,20 +221,29 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Build with Gradle
+      - name: Build with Gradle (release + debug)
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            ./gradlew clean assembleRelease -PIS_PR_BUILD=true
+            ./gradlew clean assembleRelease assembleDebug -PIS_PR_BUILD=true
           else
-            ./gradlew clean assembleRelease
+            ./gradlew clean assembleRelease assembleDebug
           fi
 
-      - name: Upload build artifact
+      - name: Upload unsigned release APK
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/ci' }}
         uses: actions/upload-artifact@v7
         with:
-          name: manager-gradle
+          name: manager-gradle-release
           path: manager/app/build/outputs/apk/release/*.apk
+          archive: false
+
+      - name: Upload unsigned debug APK
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/ci' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: manager-gradle-debug
+          path: manager/app/build/outputs/apk/debug/*.apk
+          archive: false
 
       - name: Upload mappings
         uses: actions/upload-artifact@v7
@@ -278,11 +272,17 @@ jobs:
             echo "UPLOAD=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Download gradle manager artifact
+      - name: Download gradle release APK
         uses: actions/download-artifact@v8
         with:
-          name: manager-gradle
-          path: artifacts/manager-gradle
+          name: manager-gradle-release
+          path: artifacts/manager-gradle-release
+
+      - name: Download gradle debug APK
+        uses: actions/download-artifact@v8
+        with:
+          name: manager-gradle-debug
+          path: artifacts/manager-gradle-debug
 
       - name: Download arm64 ksud
         uses: actions/download-artifact@v8
@@ -302,12 +302,16 @@ jobs:
           name: ksud-riscv64-linux-android
           path: artifacts/ksud-riscv64-linux-android
 
-      - name: Place manager apk and ksud artifacts
+      - name: Place manager APKs and ksud artifacts
         run: |
           mkdir -p manager/app/build/outputs/apk/release
-          APK=$(find artifacts/manager-gradle -type f -name "*.apk" | head -n 1)
-          test -n "$APK"
-          cp -f "$APK" manager/app/build/outputs/apk/release/
+          mkdir -p manager/app/build/outputs/apk/debug
+          RELEASE_APK=$(find artifacts/manager-gradle-release -type f -name "*.apk" | head -n 1)
+          DEBUG_APK=$(find artifacts/manager-gradle-debug -type f -name "*.apk" | head -n 1)
+          test -n "$RELEASE_APK"
+          test -n "$DEBUG_APK"
+          cp -f "$RELEASE_APK" manager/app/build/outputs/apk/release/
+          cp -f "$DEBUG_APK" manager/app/build/outputs/apk/debug/
 
           mkdir -p target/aarch64-linux-android/release
           mkdir -p target/x86_64-linux-android/release
@@ -348,7 +352,20 @@ jobs:
             echo "SIGN_KEY_PASSWORD=$PROD_KEY_PASSWORD" >> $GITHUB_ENV
           fi
 
-      - name: Repack and resign
+      - name: Read version
+        id: ver
+        run: |
+          VER=$(git describe --tags --always 2>/dev/null || echo unknown)
+          CODE=$((30000 + $(git rev-list --count HEAD 2>/dev/null || echo 0)))
+          SUFFIX=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            SUFFIX="_PR"
+          fi
+          echo "app_prefix=ViVo_KernelSU${SUFFIX}" >> $GITHUB_OUTPUT
+          echo "version_name=${VER}" >> $GITHUB_OUTPUT
+          echo "version_code=${CODE}" >> $GITHUB_OUTPUT
+
+      - name: Repack and resign (release)
         if: ${{ github.event_name == 'pull_request' || github.event_name != 'pull_request' }}
         run: |
           python3 repack_apk.py repack \
@@ -363,12 +380,48 @@ jobs:
             -S "$SIGN_KEY_PASSWORD" \
             --strip
 
-      - name: Upload build artifact
+      - name: Repack and resign (debug)
+        if: ${{ github.event_name == 'pull_request' || github.event_name != 'pull_request' }}
+        run: |
+          # Debug APK ships the same release ksud binaries and is signed with
+          # the same key; only the Gradle build type differs.
+          python3 repack_apk.py repack \
+            -b debug \
+            -t release \
+            -a arm64-v8a \
+            -a x86_64 \
+            -a riscv64 \
+            -K "$SIGN_KEYSTORE_FILE" \
+            -A "$SIGN_KEY_ALIAS" \
+            -P "$SIGN_KEYSTORE_PASSWORD" \
+            -S "$SIGN_KEY_PASSWORD" \
+            --strip
+
+      - name: Rename APKs with version
+        run: |
+          P="${{ steps.ver.outputs.app_prefix }}"
+          V="${{ steps.ver.outputs.version_name }}"
+          C="${{ steps.ver.outputs.version_code }}"
+          mkdir -p dist
+          [ -f "dist/app-release.apk" ] && mv "dist/app-release.apk" "dist/${P}_v${V}_${C}-release.apk"
+          [ -f "dist/app-debug.apk" ] && mv "dist/app-debug.apk" "dist/${P}_v${V}_${C}-debug.apk"
+          ls -la dist/
+
+      - name: Upload release APK
         if: ${{ github.event_name == 'pull_request' || github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@v7
         with:
-          name: manager
-          path: dist/*.apk
+          name: manager-release
+          path: dist/*-release.apk
+          archive: false
+
+      - name: Upload debug APK
+        if: ${{ github.event_name == 'pull_request' || github.event_name != 'pull_request' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: manager-debug
+          path: dist/*-debug.apk
+          archive: false
 
       - name: Upload to telegram
         if: github.event_name != 'pull_request' && steps.need_upload.outputs.UPLOAD == 'true'
@@ -383,7 +436,7 @@ jobs:
         run: |
           if [ ! -z "${{ secrets.BOT_TOKEN }}" ]; then
             export VERSION=$(git rev-list --count HEAD)
-            APK=$(find ./dist -name "*.apk")
+            APK=$(find ./dist -name "*-release.apk")
             pip3 install telethon
             python3 $GITHUB_WORKSPACE/scripts/ksubot.py $APK
           fi

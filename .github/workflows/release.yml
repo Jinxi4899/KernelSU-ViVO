@@ -65,7 +65,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            manager/*.apk
+            manager-release/*.apk
             lkm/lkm-*_kernelsu.ko
             ksud/ksud-*
             ksuinit/*
