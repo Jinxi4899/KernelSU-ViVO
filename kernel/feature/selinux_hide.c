@@ -249,8 +249,8 @@ static int __nocfi my_setprocattr(const char *name, void *value, size_t size)
     if (error)
         return error;
 
-    /* Obtain a SID for the context, if one was specified. */
-    if (size && str[0] && str[0] != '\n') {
+    /* Keep every non-empty value on the backup validation path */
+    if (size && str[0]) {
         if (str[size - 1] == '\n') {
             str[size - 1] = 0;
             size--;
@@ -598,14 +598,18 @@ void ksu_selinux_hide_drop_backup_if_unused()
  * Caveat:  Mutates scontext.
  */
 static int string_to_context_struct(struct policydb *pol, struct policydb *orig_pol, struct sidtab *sidtabp,
-                                    struct sidtab *orig_sidtabp, char *scontext, char *orig_scontext,
-                                    struct context *ctx, struct context *orig_ctx, u32 def_sid, int *orig_rc_p)
+                                    struct sidtab *orig_sidtabp, char *scontext, const char *source, u32 source_len,
+                                    struct context *ctx, struct context *orig_ctx, u32 policy_generation, u32 def_sid,
+                                    int *orig_rc_p)
 {
     struct role_datum *role, *orig_role;
     struct type_datum *typdatum, *orig_typdatum;
     struct user_datum *usrdatum, *orig_usrdatum;
-    char *scontextp, *orig_scontextp, *p, *orig_p, oldc, orig_oldc;
-    int rc = 0, orig_rc = 0;
+    char *scontextp, *p, oldc;
+    bool orig_valid = true;
+    bool live_valid = true;
+    int rc = -EINVAL, orig_rc = -EINVAL;
+    int type_is_original;
 
     context_init(ctx);
     context_init(orig_ctx);
@@ -630,11 +634,11 @@ static int string_to_context_struct(struct policydb *pol, struct policydb *orig_
     *orig_p++ = *p++ = 0;
 
     usrdatum = symtab_search(&pol->p_users, scontextp);
-    orig_usrdatum = symtab_search(&orig_pol->p_users, orig_scontextp);
-    if (!usrdatum)
-        goto out;
-
-    ctx->user = usrdatum->value;
+    orig_usrdatum = symtab_search(&orig_pol->p_users, scontextp);
+    if (usrdatum)
+        ctx->user = usrdatum->value;
+    else
+        live_valid = false;
     if (orig_usrdatum)
         orig_ctx->user = orig_usrdatum->value;
 
@@ -652,10 +656,11 @@ static int string_to_context_struct(struct policydb *pol, struct policydb *orig_
     *orig_p++ = *p++ = 0;
 
     role = symtab_search(&pol->p_roles, scontextp);
-    orig_role = symtab_search(&orig_pol->p_roles, orig_scontextp);
-    if (!role)
-        goto out;
-    ctx->role = role->value;
+    orig_role = symtab_search(&orig_pol->p_roles, scontextp);
+    if (role)
+        ctx->role = role->value;
+    else
+        live_valid = false;
     if (orig_role)
         orig_ctx->role = orig_role->value;
 
@@ -671,13 +676,27 @@ static int string_to_context_struct(struct policydb *pol, struct policydb *orig_
     *orig_p++ = *p++ = 0;
 
     typdatum = symtab_search(&pol->p_types, scontextp);
-    orig_typdatum = symtab_search(&orig_pol->p_types, orig_scontextp);
-    if (!typdatum || typdatum->attribute)
-        goto out;
+    if (!typdatum || typdatum->attribute) {
+        live_valid = false;
+    } else {
+        ctx->type = typdatum->value;
+        // Type values stay stable when KSU copies the live policy
+        type_is_original = ksu_type_is_original(orig_pol, policy_generation, typdatum->value);
+        if (type_is_original < 0) {
+            orig_typdatum = symtab_search(&orig_pol->p_types, scontextp);
+            if (orig_typdatum && !orig_typdatum->attribute)
+                orig_ctx->type = orig_typdatum->value;
+            else
+                orig_valid = false;
+        } else if (type_is_original) {
+            orig_ctx->type = typdatum->value;
+        } else {
+            orig_valid = false;
+        }
+    }
 
-    ctx->type = typdatum->value;
-    if (orig_typdatum && !orig_typdatum->attribute)
-        orig_ctx->type = orig_typdatum->value;
+    if (!live_valid)
+        goto out;
 
     rc = mls_context_to_sid(pol, oldc, p, ctx, sidtabp, def_sid);
     orig_rc = mls_context_to_sid(orig_pol, orig_oldc, orig_p, orig_ctx, orig_sidtabp, def_sid);
@@ -739,20 +758,19 @@ static int security_context_to_sid_with_policy(struct selinux_policy *policy, co
     orig_policy = rcu_dereference(selinux_state.policy);
     orig_policydb = &orig_policy->policydb;
     orig_sidtab = orig_policy->sidtab;
-    policydb = &policy->policydb;
-    sidtab = policy->sidtab;
-    rc = string_to_context_struct(policydb, orig_policydb, sidtab, orig_sidtab, scontext2, scontext3, &context,
-                                  &orig_context, def_sid, &orig_rc);
-    if (!rc) {
-        rc = sidtab_context_to_sid(sidtab, &context, sid);
-        // rc should not be frozen
-        context_destroy(&context);
-        // removed: if (rc == -ESTALE)
-        if (!orig_rc) {
-            // sync to global sidtab
-            orig_rc = sidtab_context_to_sid(orig_sidtab, &orig_context, &orig_sid);
-            if (orig_sid_p)
-                *orig_sid_p = orig_sid;
+
+    // parse both policies together
+    orig_rc = -EINVAL;
+    rc = string_to_context_struct(policydb, orig_policydb, sidtab, orig_sidtab, scontext2, scontext, scontext_len,
+                                  &context, &orig_context, orig_policy->latest_granting, def_sid, &orig_rc);
+    if (rc)
+        goto out_unlock;
+
+    // update backup sidtab first
+    rc = sidtab_context_to_sid(sidtab, &context, sid);
+    context_destroy(&context);
+    if (rc) {
+        if (!orig_rc)
             context_destroy(&orig_context);
         }
     }
