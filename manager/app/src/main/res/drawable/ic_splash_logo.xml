@@ -1,19 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    Static splash logo.
-
-    The previous splash used an animated-vector (ic_launcher_splash) whose
-    outline strokes are drawn via trimPathEnd animators and whose two squares
-    slide apart from an overlapping start pose. Several vendor launch windows
-    (vivo OriginOS in particular) create the animator but never drive it, so
-    the icon freezes on frame 0: strokes invisible and the squares stacked on
-    top of each other ("collapsed" splash icon).
-
-    This drawable is the static, fully-formed logo: strokes at
-    trimPathEnd="1", squares at their final separated positions and the
-    content scaled up (0.85 vs 0.60) so it fills the splash icon area the way
-    the system expects for icons rendered with a background color.
--->
+<!-- Static logo: vivo launch windows do not drive the animated-vector icon,
+     which freezes on frame 0 (overlapping squares, no strokes). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
