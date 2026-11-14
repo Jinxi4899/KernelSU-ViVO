@@ -160,7 +160,6 @@ import top.yukonga.miuix.kmp.utils.pagerGestureOverride
 class MainActivity : ComponentActivity() {
 
     private val intentChannel = Channel<Intent>(capacity = Channel.BUFFERED)
-    private var contentReady = false
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(MeWeishuLocale.wrap(newBase))
@@ -168,12 +167,11 @@ class MainActivity : ComponentActivity() {
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     override fun onCreate(savedInstanceState: Bundle?) {
-        val splashScreen = installSplashScreen()
+        // The platform splash only paints its background (its icon is transparent) and hands the
+        // screen over as soon as the first frame is drawn, which is the in-app splash. That keeps
+        // exactly one launch animation instead of two back-to-back splash screens.
+        installSplashScreen()
         super.onCreate(savedInstanceState)
-        // Hand over to the in-app animated splash as soon as the first frame is drawn; the
-        // platform splash icon animation is short (and disabled on some OEM skins), so it must
-        // not be kept on screen as a static image.
-        splashScreen.setKeepOnScreenCondition { !contentReady }
 
         // A trial only lives for the process (and task) that started it; restore the previous
         // appearance before anything else reads the theme settings.
@@ -501,7 +499,6 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
-                    SideEffect { contentReady = true }
                 }
             }
         }

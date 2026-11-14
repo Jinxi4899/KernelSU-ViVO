@@ -6,10 +6,11 @@
     </style>
 
     <style name="Theme.KernelSU.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@android:color/background_light</item>
-        <item name="windowSplashScreenIconBackgroundColor">@color/ic_splash_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_splash</item>
-        <item name="windowSplashScreenAnimationDuration">500</item>
+        <item name="windowSplashScreenBackground">@color/splash_window_background</item>
+        <!-- The single launch animation is drawn by the in-app splash; a second icon here
+             would play a duplicated splash on top of it. -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_transparent</item>
+        <item name="windowSplashScreenAnimationDuration">0</item>
         <item name="postSplashScreenTheme">@style/Theme.KernelSU</item>
     </style>
 

@@ -9,4 +9,5 @@
     <color name="ic_launcher_foreground_logo">#FFF0FDFA</color>
     <color name="ic_launcher_foreground_zako">#FFFFF7ED</color>
     <color name="ic_splash_background">#FFF5F5F5</color>
+    <color name="splash_window_background">#FFFAFAFA</color>
 </resources>

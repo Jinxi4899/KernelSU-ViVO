@@ -75,6 +75,7 @@ fun SplashScreen(
     val logoScale = remember { Animatable(0.78f) }
     val logoAlpha = remember { Animatable(0f) }
 
+    // Mirrors splash_window_background for the active app theme so the handoff has no step.
     val background = if (dark) Color(0xFF121212) else Color(0xFFFAFAFA)
     val onBackground = if (dark) Color(0xFFF2F2F2) else Color(0xFF1A1A1A)
     val iconCard = if (dark) Color(0xFF1E1E1E) else Color.White
