@@ -1,7 +1,7 @@
 package me.weishu.kernelsu.ui.component.splash
 
-import android.content.Context
-import android.content.res.Configuration
+import android.graphics.drawable.Animatable
+import android.widget.ImageView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -11,7 +11,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,40 +36,33 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.weishu.kernelsu.R
-import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
-import me.weishu.kernelsu.ui.util.BuiltinAppIcons
 
-private const val ICON_SIZE_PX = 256
 private const val EXIT_DURATION_MS = 360
 
 /**
  * In-app animated splash shown after the system splash window.
  *
- * The platform splash only animates its vector for a moment and OEM skins often disable it
- * altogether, so the app draws its own entrance: the launcher icon scales up with a soft
- * spring while the title fades in, then the whole layer fades out once content is ready.
- * Colors are theme-independent on purpose: the theme is still settling during process start.
+ * The platform splash icon animation is short and several OEM skins never start it, so the app
+ * plays the original KernelSU outline animation itself: the vector draws its border and slides
+ * the two squares together inside a scaling, fading card. Colors are theme-independent on
+ * purpose: the theme is still settling while the process starts.
  */
 @Composable
 fun SplashScreen(
     isReady: Boolean,
-    minDurationMs: Long = 850L,
+    minDurationMs: Long = 1000L,
     onDismissed: () -> Unit = {},
 ) {
     var contentVisible by remember { mutableStateOf(false) }
@@ -79,12 +71,8 @@ fun SplashScreen(
     val currentOnDismissed by rememberUpdatedState(onDismissed)
 
     val dark = isInDarkTheme()
-    val context = LocalContext.current
-    val appIconBitmap = remember(context, dark) {
-        loadAppIcon(context.withNightMode(dark))
-    }
 
-    val logoScale = remember { Animatable(0.72f) }
+    val logoScale = remember { Animatable(0.78f) }
     val logoAlpha = remember { Animatable(0f) }
 
     val background = if (dark) Color(0xFF121212) else Color(0xFFFAFAFA)
@@ -93,7 +81,7 @@ fun SplashScreen(
 
     LaunchedEffect(Unit) {
         contentVisible = true
-        launch { logoAlpha.animateTo(1f, tween(320, easing = FastOutSlowInEasing)) }
+        launch { logoAlpha.animateTo(1f, tween(260, easing = FastOutSlowInEasing)) }
         launch {
             logoScale.animateTo(
                 targetValue = 1f,
@@ -156,29 +144,39 @@ fun SplashScreen(
                                 scaleY = logoScale.value
                                 alpha = logoAlpha.value
                             }
-                            .size(88.dp)
-                            .shadow(12.dp, shape = RoundedCornerShape(24.dp), clip = false)
-                            .clip(RoundedCornerShape(24.dp))
+                            .size(112.dp)
+                            .shadow(12.dp, shape = RoundedCornerShape(28.dp), clip = false)
+                            .clip(RoundedCornerShape(28.dp))
                             .background(iconCard),
                         contentAlignment = Alignment.Center,
                     ) {
-                        appIconBitmap?.let { bitmap ->
-                            Image(
-                                bitmap = bitmap,
-                                contentDescription = stringResource(id = R.string.app_name),
-                                modifier = Modifier
-                                    .size(76.dp)
-                                    .clip(RoundedCornerShape(20.dp)),
-                                contentScale = ContentScale.Crop,
-                            )
-                        }
+                        AndroidView(
+                            modifier = Modifier.fillMaxSize(),
+                            factory = { context ->
+                                ImageView(context).apply {
+                                    contentDescription = context.getString(R.string.app_name)
+                                    // The animated vector keeps its artwork inside a 60% safe area;
+                                    // scale it up so the drawn logo fills the rounded card the way
+                                    // the system splash icon does.
+                                    scaleX = 1.55f
+                                    scaleY = 1.55f
+                                    ContextCompat.getDrawable(context, R.drawable.ic_launcher_splash)
+                                        ?.let { drawable ->
+                                            setImageDrawable(drawable)
+                                            // Start after the view is attached so the drawable's
+                                            // bounds are known and the animation is not dropped.
+                                            post { (drawable as? Animatable)?.start() }
+                                        }
+                                }
+                            },
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(18.dp))
 
                     AnimatedVisibility(
                         visible = contentVisible,
-                        enter = fadeIn(tween(400, delayMillis = 180, easing = FastOutSlowInEasing)),
+                        enter = fadeIn(tween(320, delayMillis = 120, easing = FastOutSlowInEasing)),
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
@@ -201,7 +199,7 @@ fun SplashScreen(
 
                 AnimatedVisibility(
                     visible = contentVisible,
-                    enter = fadeIn(tween(450, delayMillis = 260, easing = FastOutSlowInEasing)),
+                    enter = fadeIn(tween(380, delayMillis = 200, easing = FastOutSlowInEasing)),
                 ) {
                     Text(
                         text = stringResource(id = R.string.splash_motto),
@@ -213,23 +211,4 @@ fun SplashScreen(
             }
         }
     }
-}
-
-private fun Context.withNightMode(isDark: Boolean): Context {
-    val config = Configuration(resources.configuration)
-    val nightFlag = if (isDark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
-    config.uiMode = (config.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or nightFlag
-    return createConfigurationContext(config)
-}
-
-private fun loadAppIcon(themedContext: Context): ImageBitmap? {
-    val selectedIcon = runCatching { BuiltinAppIcons.find(SettingsRepositoryImpl().appIconId) }.getOrNull()
-    return listOfNotNull(selectedIcon?.iconRes, R.mipmap.ic_launcher, R.drawable.ic_launcher_foreground)
-        .firstNotNullOfOrNull { resId ->
-            runCatching {
-                ContextCompat.getDrawable(themedContext, resId)
-                    ?.toBitmap(width = ICON_SIZE_PX, height = ICON_SIZE_PX)
-                    ?.asImageBitmap()
-            }.getOrNull()
-        }
 }
