@@ -21,8 +21,8 @@ const llmsTxtTemplate = `# {title}
 ## Official links
 
 - Website: ${SITE_URL}
-- Source code: https://github.com/tiann/KernelSU
-- Downloads (manager APK, LKM and GKI images): https://github.com/tiann/KernelSU/releases
+- Source code: https://github.com/Jinxi4899/KernelSU-ViVO
+- Downloads (manager APK, LKM and GKI images): https://github.com/Jinxi4899/KernelSU-ViVO/releases
 - Telegram: https://t.me/KernelSU
 
 ## Table of Contents

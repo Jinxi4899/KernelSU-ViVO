@@ -1,0 +1,28 @@
+package me.weishu.kernelsu.ui.screen.appicon
+
+import androidx.compose.runtime.Immutable
+import me.weishu.kernelsu.ui.util.AppIconEntry
+import me.weishu.kernelsu.ui.util.AppIconPack
+import me.weishu.kernelsu.ui.util.BuiltinAppIcon
+
+@Immutable
+data class AppIconUiState(
+    val selectedBuiltinId: String,
+    val dynamicColor: Boolean = false,
+    val packs: List<AppIconPack> = emptyList(),
+    val loading: Boolean = true,
+    val importing: Boolean = false,
+    val pendingDelete: AppIconPack? = null,
+)
+
+@Immutable
+data class AppIconActions(
+    val onBack: () -> Unit,
+    val onSelectBuiltin: (BuiltinAppIcon) -> Unit,
+    val onSetDynamicColor: (Boolean) -> Unit,
+    val onImportPack: () -> Unit,
+    val onPinCustomIcon: (AppIconPack, AppIconEntry) -> Unit,
+    val onRequestDeletePack: (AppIconPack) -> Unit,
+    val onDismissDeletePack: () -> Unit,
+    val onConfirmDeletePack: (AppIconPack) -> Unit,
+)

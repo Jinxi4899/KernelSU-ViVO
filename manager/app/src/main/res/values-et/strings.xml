@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="home_working">Töötamine</string>
     <string name="home_working_version">Versioon: %s</string>
@@ -136,4 +136,5 @@ Liitu meie %2$si kanaliga</string>
     <string name="profile_flags_desc_no_new_privs">Takistab õiguste edasist tõstmist KernelSU kaudu selle root-profiili kontekstis.</string>
     <string name="install_force_backup">Varunda kui tehasepilt</string>
     <string name="install_force_backup_summary">Veendu, et valitud boot-tõmmis on tehasepilt</string>
+<string name="settings_module_check_update">Kontrolli moodulite uuendusi</string>
 </resources>

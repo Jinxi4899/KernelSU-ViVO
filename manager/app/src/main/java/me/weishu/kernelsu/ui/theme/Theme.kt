@@ -10,6 +10,9 @@ import me.weishu.kernelsu.data.repository.SettingsRepository
 import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
 import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.util.AppearanceOverlayStore
+import me.weishu.kernelsu.ui.util.ResolvedAppearance
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
 
 enum class ColorMode(val value: Int) {
     SYSTEM(0),
@@ -49,6 +52,8 @@ data class AppSettings(
     val keyColor: Int,
     val paletteStyle: PaletteStyle,
     val colorSpec: ColorSpec.SpecVersion,
+    /** Static user/theme overrides applied on top of the generated palette. */
+    val appearance: ResolvedAppearance? = null,
 )
 
 val PaletteStyle.supportsSpec2025: Boolean
@@ -96,7 +101,7 @@ object ThemeController {
             ColorSpec.SpecVersion.SPEC_2025
         }
 
-        return AppSettings(colorMode, keyColor, paletteStyle, colorSpec)
+        return AppSettings(colorMode, keyColor, paletteStyle, colorSpec, AppearanceOverlayStore.load(repo))
     }
 }
 
@@ -132,6 +137,9 @@ fun isInDarkTheme(): Boolean {
 
 val LocalColorMode = staticCompositionLocalOf { 0 }
 
+/** Palette snapshot of the current process, reused by nested Material themes. */
+val LocalAppSettings = staticCompositionLocalOf<AppSettings?> { null }
+
 val LocalEnableBlur = staticCompositionLocalOf { false }
 
 val LocalEnableFloatingBottomBar = staticCompositionLocalOf { false }
@@ -141,3 +149,45 @@ val LocalEnableFloatingBottomBarBlur = staticCompositionLocalOf { false }
 val LocalEnableNavigationBadge = staticCompositionLocalOf { true }
 
 val LocalModuleDescriptionMaxLines = staticCompositionLocalOf { 4 }
+
+/** Active background image path; empty when no custom background is applied. */
+val LocalBackgroundImagePath = staticCompositionLocalOf { "" }
+
+/**
+ * Captures the app background image (and its scrim) exactly as drawn behind the navigation host.
+ *
+ * `layerBackdrop` only records the page it is attached to, so over a custom background the
+ * unpainted parts of that layer are fully transparent. Miuix bar blurs sample that layer, and
+ * transparent pixels bleed black into the result, so bars combine this backdrop underneath their
+ * own page backdrop to blur what is actually on screen. Null when no capture is available.
+ */
+val LocalAppBackgroundBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
+
+@Composable
+fun backgroundAwareCardColors(
+    color: androidx.compose.ui.graphics.Color = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.surfaceContainer,
+    contentColor: androidx.compose.ui.graphics.Color = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onSurfaceContainer,
+    backgroundAlpha: Float = LocalCardBackgroundAlpha.current,
+): top.yukonga.miuix.kmp.basic.CardColors {
+    val adjusted = if (LocalBackgroundImagePath.current.isNotEmpty()) {
+        color.copy(alpha = backgroundAlpha)
+    } else {
+        color
+    }
+    return top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(
+        color = adjusted,
+        contentColor = contentColor,
+    )
+}
+
+@Composable
+fun backgroundAwareColor(
+    color: androidx.compose.ui.graphics.Color,
+    backgroundAlpha: Float = LocalCardBackgroundAlpha.current,
+): androidx.compose.ui.graphics.Color {
+    return if (LocalBackgroundImagePath.current.isNotEmpty()) {
+        color.copy(alpha = backgroundAlpha)
+    } else {
+        color
+    }
+}

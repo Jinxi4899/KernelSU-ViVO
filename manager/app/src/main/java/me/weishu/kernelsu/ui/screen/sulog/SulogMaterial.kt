@@ -75,6 +75,8 @@ import me.weishu.kernelsu.ui.component.material.SegmentedListItem
 import me.weishu.kernelsu.ui.component.material.TonalCard
 import me.weishu.kernelsu.ui.component.material.TopBarBackButton
 import me.weishu.kernelsu.ui.component.statustag.StatusTag
+import me.weishu.kernelsu.ui.theme.CustomTextKey
+import me.weishu.kernelsu.ui.theme.customText
 import me.weishu.kernelsu.ui.util.SulogEntry
 import me.weishu.kernelsu.ui.util.SulogEventFilter
 
@@ -110,7 +112,7 @@ fun SulogScreenMaterial(
         topBar = {
             SearchAppBar(
                 snackbarHostState = snackbarHostState,
-                title = { Text(stringResource(R.string.settings_sulog)) },
+                title = { Text(customText(CustomTextKey.PAGE_SULOG)) },
                 searchText = localSearchText,
                 onSearchTextChange = {
                     localSearchText = it

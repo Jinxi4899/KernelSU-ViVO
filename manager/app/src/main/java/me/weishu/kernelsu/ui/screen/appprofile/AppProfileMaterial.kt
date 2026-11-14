@@ -72,6 +72,8 @@ import me.weishu.kernelsu.ui.component.profile.AppProfileConfig
 import me.weishu.kernelsu.ui.component.profile.RootProfileConfig
 import me.weishu.kernelsu.ui.component.profile.TemplateConfig
 import me.weishu.kernelsu.ui.component.statustag.StatusTag
+import me.weishu.kernelsu.ui.theme.CustomTextKey
+import me.weishu.kernelsu.ui.theme.customText
 import me.weishu.kernelsu.ui.util.ownerNameForUid
 import me.weishu.kernelsu.ui.viewmodel.SuperUserViewModel
 
@@ -345,7 +347,7 @@ private fun TopBar(
 ) {
     val haptic = LocalHapticFeedback.current
     LargeFlexibleTopAppBar(
-        title = { Text(stringResource(R.string.profile)) },
+        title = { Text(customText(CustomTextKey.PAGE_APP_PROFILE)) },
         navigationIcon = {
             TopBarBackButton(onClick = onBack)
         },

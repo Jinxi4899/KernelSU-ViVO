@@ -16,4 +16,13 @@ data class MainActivityUiState(
     val pagerInterceptionMode: Int,
     val moduleDescriptionMaxLines: Int = 4,
     val uiMode: UiMode,
+    // ---- Appearance / theme ----
+    val customBackgroundUri: String = "",
+    val customBackgroundUpdatedAt: Long = 0L,
+    val customBackgroundBlurPercent: Int = 50,
+    val customBackgroundScrimPercent: Int = -35,
+    val cardBackgroundAlphaPercent: Int = 60,
+    val enableProgressiveBlur: Boolean = false,
+    val useSystemWallpaper: Boolean = false,
+    val customTexts: Map<String, String> = emptyMap(),
 )

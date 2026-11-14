@@ -21,10 +21,11 @@ val androidSourceCompatibility = rootProject.extra["androidSourceCompatibility"]
 val androidTargetCompatibility = rootProject.extra["androidTargetCompatibility"] as JavaVersion
 val managerVersionCode = rootProject.extra["managerVersionCode"] as Int
 val managerVersionName = rootProject.extra["managerVersionName"] as String
+val managerShortHash = rootProject.extra["managerShortHash"] as String
 
 val isPrBuild = project.findProperty("IS_PR_BUILD")?.toString()?.toBoolean() ?: false
 val defaultManagerPackageName = if (isPrBuild) "me.weishu.kernelsu.pr" else "me.weishu.kernelsu"
-val defaultManagerName = if (isPrBuild) "KernelSU PR" else "KernelSU"
+val defaultManagerName = if (isPrBuild) "ViVo-KernelSU PR" else "ViVo-KernelSU"
 val managerPackageName = project.findProperty("KSU_PACKAGE_NAME")?.toString() ?: defaultManagerPackageName
 val managerName = project.findProperty("KSU_NAME")?.toString() ?: defaultManagerName
 
@@ -149,6 +150,13 @@ android {
         applicationId = managerPackageName
 
         buildConfigField("boolean", "IS_PR_BUILD", isPrBuild.toString())
+        // In-app version label: <versionName>-<versionCode>-<shortHash>, e.g. 1.0.0-32728-a1b2c3d.
+        // The kernel UAPI is deliberately not part of it; it stays in the status rows that need it.
+        buildConfigField(
+            "String",
+            "VERSION_DISPLAY",
+            "\"$managerVersionName-$managerVersionCode-$managerShortHash\""
+        )
         resValue("string", "app_name", managerName)
 
         externalNativeBuild {
@@ -234,6 +242,7 @@ dependencies {
 
     implementation(platform(libs.okhttp.bom))
     implementation(libs.okhttp)
+    implementation(libs.coil.compose)
 
     implementation(libs.material.kolor)
 

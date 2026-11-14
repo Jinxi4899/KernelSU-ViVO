@@ -1,18 +1,24 @@
-name: Release
+name: 编译release并发布
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to create and publish (e.g. v1.0.0)'
+        required: true
+        type: string
+permissions:
+  contents: write
 
 jobs:
   build-manager:
     uses: ./.github/workflows/build-manager.yml
+    with:
+      version_name: ${{ inputs.tag }}
     secrets: inherit
   release:
     needs:
       - build-manager
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v8
@@ -64,8 +70,12 @@ jobs:
       - name: release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ inputs.tag }}
+          name: ${{ inputs.tag }}
+          target_commitish: main
+          make_latest: true
           files: |
-            manager/*.apk
+            ViVo-KernelSU/*.apk
             lkm/lkm-*_kernelsu.ko
             ksud/ksud-*
             ksuinit/*

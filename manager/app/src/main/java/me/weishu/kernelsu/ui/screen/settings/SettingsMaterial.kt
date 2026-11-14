@@ -23,12 +23,15 @@ import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.DisplaySettings
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LayersClear
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Security
+import me.weishu.kernelsu.ui.component.Storefront
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.SystemUpdateAlt
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeFlexibleTopAppBar
@@ -60,6 +63,11 @@ import me.weishu.kernelsu.ui.component.material.SendLogBottomSheet
 import me.weishu.kernelsu.ui.component.material.SnackBarHost
 import me.weishu.kernelsu.ui.component.material.expressiveTopAppBarColors
 import me.weishu.kernelsu.ui.component.uninstalldialog.UninstallDialog
+import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.navigation3.Route
+import me.weishu.kernelsu.ui.theme.CustomTextKey
+import me.weishu.kernelsu.ui.theme.customText
+import me.weishu.kernelsu.ui.util.LocaleHelper
 
 /**
  * @author weishu
@@ -75,6 +83,7 @@ fun SettingPagerMaterial(
     val snackBarHost = remember { SnackbarHostState() }
     val showUninstallDialog = rememberSaveable { mutableStateOf(false) }
     var showBottomSheet by remember { mutableStateOf(false) }
+    val navigator = LocalNavigator.current
 
     UninstallDialog(
         show = showUninstallDialog.value,
@@ -126,11 +135,26 @@ fun SettingPagerMaterial(
                     add {
                         SegmentedDropdownItem(
                             icon = Icons.Filled.DisplaySettings,
-                            title = stringResource(id = R.string.settings_ui_mode),
+                            title = customText(CustomTextKey.SETTING_UI_MODE),
                             summary = stringResource(id = R.string.settings_ui_mode_summary),
                             items = UiMode.entries.map { it.name },
                             selectedIndex = if (uiState.uiMode == UiMode.Material.value) 1 else 0,
                             onItemSelected = actions.onSetUiModeIndex
+                        )
+                    }
+                    add {
+                        val languageSystemLabel = stringResource(id = R.string.settings_language_system)
+                        val languageTags = listOf(LocaleHelper.SYSTEM) + LocaleHelper.SUPPORTED_TAGS
+                        val languageNames = languageTags.map {
+                            if (it.isEmpty()) languageSystemLabel else LocaleHelper.displayName(it)
+                        }
+                        SegmentedDropdownItem(
+                            icon = Icons.Filled.Language,
+                            title = customText(CustomTextKey.SETTING_LANGUAGE),
+                            summary = stringResource(id = R.string.settings_language_summary),
+                            items = languageNames,
+                            selectedIndex = languageTags.indexOf(uiState.appLanguage).coerceAtLeast(0),
+                            onItemSelected = { index -> actions.onSetLanguage(languageTags[index]) }
                         )
                     }
                     add {
@@ -139,6 +163,21 @@ fun SettingPagerMaterial(
                             headlineContent = { Text(stringResource(id = R.string.settings_theme)) },
                             supportingContent = { Text(stringResource(id = R.string.settings_theme_summary)) },
                             leadingContent = { Icon(Icons.Filled.Palette, stringResource(id = R.string.settings_theme)) },
+                            trailingContent = {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    null
+                                )
+                            }
+                        )
+                    }
+                    add {
+                        val title = customText(CustomTextKey.PAGE_THEME_STORE)
+                        SegmentedListItem(
+                            onClick = { navigator.push(Route.ThemeStore()) },
+                            headlineContent = { Text(title) },
+                            supportingContent = { Text(stringResource(id = R.string.theme_store_summary)) },
+                            leadingContent = { Icon(Icons.Filled.Storefront, title) },
                             trailingContent = {
                                 Icon(
                                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -190,7 +229,7 @@ fun SettingPagerMaterial(
                             }
                             SegmentedDropdownItem(
                                 icon = Icons.Filled.AdminPanelSettings,
-                                title = stringResource(id = R.string.settings_sucompat),
+                                title = customText(CustomTextKey.SETTING_SUCOMPAT),
                                 summary = suSummary,
                                 items = suCompatModeItems,
                                 enabled = uiState.suCompatStatus == "supported",
@@ -207,7 +246,7 @@ fun SettingPagerMaterial(
                             }
                             SegmentedSwitchItem(
                                 icon = Icons.Filled.LayersClear,
-                                title = stringResource(id = R.string.settings_kernel_umount),
+                                title = customText(CustomTextKey.SETTING_KERNEL_UMOUNT),
                                 summary = umountSummary,
                                 enabled = uiState.kernelUmountStatus == "supported",
                                 checked = uiState.isKernelUmountEnabled,
@@ -223,7 +262,7 @@ fun SettingPagerMaterial(
                             }
                             SegmentedSwitchItem(
                                 icon = Icons.Filled.Security,
-                                title = stringResource(id = R.string.settings_selinux_hide),
+                                title = customText(CustomTextKey.SETTING_SELINUX_HIDE),
                                 summary = selinuxHideSummary,
                                 enabled = uiState.selinuxHideStatus == "supported",
                                 checked = uiState.isSelinuxHideEnabled,
@@ -239,7 +278,7 @@ fun SettingPagerMaterial(
                             }
                             SegmentedSwitchItem(
                                 icon = Icons.AutoMirrored.Filled.Article,
-                                title = stringResource(id = R.string.settings_sulog),
+                                title = customText(CustomTextKey.SETTING_SULOG),
                                 summary = sulogSummary,
                                 enabled = uiState.sulogStatus == "supported",
                                 checked = uiState.isSulogEnabled,
@@ -255,7 +294,7 @@ fun SettingPagerMaterial(
                             }
                             SegmentedSwitchItem(
                                 icon = Icons.Filled.Adb,
-                                title = stringResource(id = R.string.settings_adb_root),
+                                title = customText(CustomTextKey.SETTING_ADB_ROOT),
                                 summary = adbRootSummary,
                                 enabled = uiState.adbRootStatus == "supported",
                                 checked = uiState.isAdbRootEnabled,
@@ -271,7 +310,7 @@ fun SettingPagerMaterial(
                             }
                             SegmentedSwitchItem(
                                 icon = Icons.Filled.VerifiedUser,
-                                title = stringResource(id = R.string.settings_shell_su_adb_only),
+                                title = customText(CustomTextKey.SETTING_SHELL_SU),
                                 summary = shellSuAdbOnlySummary,
                                 enabled = uiState.shellSuAdbOnlyStatus == "supported",
                                 checked = uiState.isShellSuAdbOnlyEnabled,
@@ -281,7 +320,7 @@ fun SettingPagerMaterial(
                         {
                             SegmentedSwitchItem(
                                 icon = Icons.Filled.RestartAlt,
-                                title = stringResource(id = R.string.settings_soft_reboot),
+                                title = customText(CustomTextKey.SETTING_SOFT_REBOOT),
                                 summary = stringResource(id = R.string.settings_soft_reboot_summary),
                                 enabled = !uiState.isLateLoadMode,
                                 checked = uiState.isLateLoadMode || uiState.useSoftReboot,
@@ -297,7 +336,7 @@ fun SettingPagerMaterial(
                         {
                             SegmentedSwitchItem(
                                 icon = Icons.AutoMirrored.Filled.Rule,
-                                title = stringResource(id = R.string.settings_umount_modules_default),
+                                title = customText(CustomTextKey.SETTING_UMOUNT_MODULES_DEFAULT),
                                 summary = stringResource(id = R.string.settings_umount_modules_default_summary),
                                 checked = uiState.isDefaultUmountModules,
                                 onCheckedChange = actions.onSetDefaultUmountModules
@@ -306,7 +345,7 @@ fun SettingPagerMaterial(
                         {
                             SegmentedSwitchItem(
                                 icon = Icons.Filled.DeveloperMode,
-                                title = stringResource(id = R.string.enable_web_debugging),
+                                title = customText(CustomTextKey.SETTING_WEB_DEBUGGING),
                                 summary = stringResource(id = R.string.enable_web_debugging_summary),
                                 checked = uiState.enableWebDebugging,
                                 onCheckedChange = actions.onSetEnableWebDebugging
@@ -315,7 +354,7 @@ fun SettingPagerMaterial(
                         {
                             SegmentedSwitchItem(
                                 icon = Icons.Filled.FlashOn,
-                                title = stringResource(id = R.string.settings_auto_jailbreak),
+                                title = customText(CustomTextKey.SETTING_AUTO_JAILBREAK),
                                 summary = stringResource(id = R.string.settings_auto_jailbreak_summary),
                                 enabled = uiState.isLateLoadMode,
                                 checked = uiState.autoJailbreak,
@@ -331,7 +370,7 @@ fun SettingPagerMaterial(
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 13.dp),
                     content = listOf(
                         {
-                            val uninstall = stringResource(id = R.string.settings_uninstall)
+                            val uninstall = customText(CustomTextKey.SETTING_UNINSTALL)
                             SegmentedListItem(
                                 onClick = { showUninstallDialog.value = true },
                                 enabled = !uiState.isLateLoadMode,
@@ -349,7 +388,7 @@ fun SettingPagerMaterial(
                     {
                         SegmentedListItem(
                             onClick = { showBottomSheet = true },
-                            headlineContent = { Text(stringResource(id = R.string.send_log)) },
+                            headlineContent = { Text(customText(CustomTextKey.SETTING_SEND_LOG)) },
                             leadingContent = {
                                 Icon(
                                     Icons.Filled.BugReport,
@@ -391,7 +430,7 @@ private fun TopBar(
     scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
     LargeFlexibleTopAppBar(
-        title = { Text(stringResource(R.string.settings)) },
+        title = { Text(customText(CustomTextKey.PAGE_SETTINGS)) },
         colors = expressiveTopAppBarColors(),
         windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         scrollBehavior = scrollBehavior

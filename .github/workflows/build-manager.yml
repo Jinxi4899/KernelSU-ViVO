@@ -1,51 +1,33 @@
-name: Build Manager
+name: 编译release
 
 on:
-  push:
-    branches: [ "main", "dev", "ci" ]
-    paths:
-      - '.github/workflows/build-manager.yml'
-      - '.github/workflows/build-lkm.yml'
-      - '.github/workflows/ddk-lkm.yml'
-      - '.github/workflows/ksud.yml'
-      - '.github/workflows/ksud-extra.yml'
-      - '.github/workflows/ksuinit.yml'
-      - '.github/scripts/setup-rust-build.sh'
-      - '.github/riscv64-cargo.toml'
-      - 'repack_apk.py'
-      - 'manager/**'
-      - 'kernel/**'
-      - 'userspace/**'
-      - 'Cargo.lock'
-      - 'Cargo.toml'
-  pull_request:
-    branches: [ "main", "dev" ]
-    paths:
-      - '.github/workflows/build-manager.yml'
-      - '.github/workflows/build-lkm.yml'
-      - '.github/workflows/ddk-lkm.yml'
-      - '.github/workflows/ksud.yml'
-      - '.github/workflows/ksud-extra.yml'
-      - '.github/workflows/ksuinit.yml'
-      - '.github/scripts/setup-rust-build.sh'
-      - '.github/riscv64-cargo.toml'
-      - 'repack_apk.py'
-      - 'manager/**'
-      - 'kernel/**'
-      - 'userspace/**'
-      - 'Cargo.lock'
-      - 'Cargo.toml'
+  workflow_dispatch:
+    inputs:
+      upload_apk:
+        description: 'Upload the APK as a directly downloadable release asset'
+        type: boolean
+        default: true
+      version_name:
+        description: 'Manager version name (defaults to git describe)'
+        type: string
+        default: ''
   workflow_call:
+    inputs:
+      upload_apk:
+        type: boolean
+        default: false
+      version_name:
+        type: string
+        default: ''
+permissions:
+  contents: write
 
 jobs:
   generate-key:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       expected_size: ${{ steps.extract.outputs.expected_size }}
       expected_hash: ${{ steps.extract.outputs.expected_hash }}
-      keystore: ${{ steps.gen.outputs.keystore }}
-      keystore_password: ${{ steps.gen.outputs.keystore_password }}
-      key_password: ${{ steps.gen.outputs.key_password }}
     steps:
       - name: Generate temporary keystore
         if: github.event_name == 'pull_request'
@@ -55,6 +37,7 @@ jobs:
           KEY_PASSWORD=$(openssl rand -hex 32)
           echo "keystore_password=$KEYSTORE_PASSWORD" >> $GITHUB_OUTPUT
           echo "key_password=$KEY_PASSWORD" >> $GITHUB_OUTPUT
+          echo "key_alias=pr-key" >> $GITHUB_OUTPUT
 
           keytool -genkeypair \
             -alias pr-key \
@@ -62,31 +45,59 @@ jobs:
             -validity 1 \
             -storepass "$KEYSTORE_PASSWORD" \
             -keypass "$KEY_PASSWORD" \
-            -dname "CN=KernelSU PR Build" \
+            -dname "CN=ViVo-KernelSU PR Build" \
             -storetype JKS \
             -keystore pr-key.jks
 
           echo "keystore=$(base64 -w 0 pr-key.jks)" >> $GITHUB_OUTPUT
 
+      - name: Use production keystore metadata
+        if: github.event_name != 'pull_request'
+        id: gen_prod
+        env:
+          PROD_KEYSTORE: ${{ secrets.KEYSTORE }}
+          PROD_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          PROD_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          PROD_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          test -n "$PROD_KEYSTORE"
+          test -n "$PROD_KEYSTORE_PASSWORD"
+          test -n "$PROD_KEY_ALIAS"
+          test -n "$PROD_KEY_PASSWORD"
+
       - name: Extract certificate hash and size
-        if: github.event_name == 'pull_request'
         id: extract
         env:
-          STORE_PASS: ${{ steps.gen.outputs.keystore_password }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_STORE_PASS: ${{ steps.gen.outputs.keystore_password }}
+          PROD_KEYSTORE: ${{ secrets.KEYSTORE }}
+          PROD_STORE_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          PROD_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          # Export DER certificate
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            KEYSTORE_FILE=pr-key.jks
+            KEY_ALIAS=pr-key
+            STORE_PASS="$PR_STORE_PASS"
+          else
+            test -n "$PROD_KEYSTORE"
+            test -n "$PROD_STORE_PASS"
+            test -n "$PROD_KEY_ALIAS"
+            echo "$PROD_KEYSTORE" | base64 -d > key.jks
+            KEYSTORE_FILE=key.jks
+            KEY_ALIAS="$PROD_KEY_ALIAS"
+            STORE_PASS="$PROD_STORE_PASS"
+          fi
+
           keytool -exportcert \
-            -alias pr-key \
-            -keystore pr-key.jks \
+            -alias "$KEY_ALIAS" \
+            -keystore "$KEYSTORE_FILE" \
             -storepass "$STORE_PASS" \
             -file pr-cert.der
 
-          # Calculate size in hex
           SIZE_DEC=$(stat -c%s pr-cert.der)
           SIZE_HEX=$(printf '0x%04x' "$SIZE_DEC")
           echo "expected_size=$SIZE_HEX" >> $GITHUB_OUTPUT
 
-          # Calculate SHA256 hash
           HASH=$(sha256sum pr-cert.der | awk '{print $1}')
           echo "expected_hash=$HASH" >> $GITHUB_OUTPUT
 
@@ -101,11 +112,19 @@ jobs:
       expected_hash: ${{ needs.generate-key.outputs.expected_hash || '' }}
     secrets: inherit
 
+  build-lkm-vivo:
+    needs: generate-key
+    uses: ./.github/workflows/build-lkm-vivo.yml
+    with:
+      expected_size: ${{ needs.generate-key.outputs.expected_size || '' }}
+      expected_hash: ${{ needs.generate-key.outputs.expected_hash || '' }}
+    secrets: inherit
+
   build-ksuinit:
     uses: ./.github/workflows/ksuinit.yml
 
   build-ksud:
-    needs: [build-lkm, build-ksuinit]
+    needs: [build-lkm, build-lkm-vivo, build-ksuinit]
     strategy:
       matrix:
         include:
@@ -119,20 +138,20 @@ jobs:
       pack_ksuinit: true
   
   build-ksud-extra:
-    needs: [build-lkm, build-ksuinit]
+    needs: [build-lkm, build-lkm-vivo, build-ksuinit]
     strategy:
       matrix:
         include:
           - target: x86_64-pc-windows-gnu # windows pc
-            os: ubuntu-latest
+            os: ubuntu-24.04
           - target: x86_64-apple-darwin # Intel mac
             os: macos-latest
           - target: aarch64-apple-darwin # M chip mac
             os: macos-latest
           - target: aarch64-unknown-linux-musl # arm64 Linux
-            os: ubuntu-latest
+            os: ubuntu-24.04
           - target: x86_64-unknown-linux-musl # x86 Linux
-            os: ubuntu-latest
+            os: ubuntu-24.04
     uses: ./.github/workflows/ksud-extra.yml
     with:
       target: ${{ matrix.target }}
@@ -143,7 +162,7 @@ jobs:
   build-manager:
     needs: [generate-key]
     if: always() && needs.generate-key.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: ./manager
@@ -153,9 +172,10 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          fetch-tags: true
 
       - name: Write key
-        if: ${{ ( github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' )) || github.ref_type == 'tag' }}
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           if [ ! -z "${{ secrets.KEYSTORE }}" ]; then
             {
@@ -192,6 +212,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Build with Gradle
+        env:
+          MANAGER_VERSION_NAME: ${{ inputs.version_name }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             ./gradlew clean assembleRelease -PIS_PR_BUILD=true
@@ -200,15 +222,15 @@ jobs:
           fi
 
       - name: Upload build artifact
-        if: ${{ github.event_name == 'pull_request' || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) || github.ref_type == 'tag' }}
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/ci' }}
         uses: actions/upload-artifact@v7
         with:
-          name: manager-gradle
+          name: ViVo-KernelSU-gradle
           path: manager/app/build/outputs/apk/release/*.apk
 
       - name: Upload mappings
         uses: actions/upload-artifact@v7
-        if: ${{ ( github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' )) || github.ref_type == 'tag' }}
+        if: ${{ github.event_name != 'pull_request' }}
         with:
           name: "mappings"
           path: "manager/app/build/outputs/mapping/release/"
@@ -216,7 +238,7 @@ jobs:
   repack-manager:
     needs: [build-manager, build-ksud, generate-key]
     if: always() && needs.build-manager.result == 'success' && needs.build-ksud.result == 'success' && needs.generate-key.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -236,8 +258,8 @@ jobs:
       - name: Download gradle manager artifact
         uses: actions/download-artifact@v8
         with:
-          name: manager-gradle
-          path: artifacts/manager-gradle
+          name: ViVo-KernelSU-gradle
+          path: artifacts/ViVo-KernelSU-gradle
 
       - name: Download arm64 ksud
         uses: actions/download-artifact@v8
@@ -260,7 +282,7 @@ jobs:
       - name: Place manager apk and ksud artifacts
         run: |
           mkdir -p manager/app/build/outputs/apk/release
-          APK=$(find artifacts/manager-gradle -type f -name "*.apk" | head -n 1)
+          APK=$(find artifacts/ViVo-KernelSU-gradle -type f -name "*.apk" | head -n 1)
           test -n "$APK"
           cp -f "$APK" manager/app/build/outputs/apk/release/
 
@@ -278,7 +300,7 @@ jobs:
           cp -f "$RISCV64_KSUD" target/riscv64-linux-android/release/ksud
 
       - name: Prepare signing inputs
-        if: ${{ github.event_name == 'pull_request' || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) || github.ref_type == 'tag' }}
+        if: ${{ github.event_name == 'pull_request' || github.event_name != 'pull_request' }}
         env:
           PR_KEYSTORE: ${{ needs.generate-key.outputs.keystore }}
           PR_KEYSTORE_PASSWORD: ${{ needs.generate-key.outputs.keystore_password }}
@@ -304,7 +326,7 @@ jobs:
           fi
 
       - name: Repack and resign
-        if: ${{ github.event_name == 'pull_request' || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) || github.ref_type == 'tag' }}
+        if: ${{ github.event_name == 'pull_request' || github.event_name != 'pull_request' }}
         run: |
           python3 repack_apk.py repack \
             -b release \
@@ -319,10 +341,10 @@ jobs:
             --strip
 
       - name: Upload build artifact
-        if: ${{ github.event_name == 'pull_request' || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) || github.ref_type == 'tag' }}
+        if: ${{ github.event_name == 'pull_request' || github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@v7
         with:
-          name: manager
+          name: ViVo-KernelSU
           path: dist/*.apk
 
       - name: Upload to telegram
@@ -333,7 +355,7 @@ jobs:
           MESSAGE_THREAD_ID: ${{ secrets.MESSAGE_THREAD_ID }}
           GITHUB_EVENT: ${{ toJson(github.event) }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          TITLE: Manager
+          TITLE: ViVo-KernelSU
           BRANCH: ${{ github.ref_name }}
         run: |
           if [ ! -z "${{ secrets.BOT_TOKEN }}" ]; then
@@ -342,3 +364,13 @@ jobs:
             pip3 install telethon
             python3 $GITHUB_WORKSPACE/scripts/ksubot.py $APK
           fi
+
+      - name: Upload APK as a directly downloadable asset
+        if: ${{ inputs.upload_apk }}
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ViVo-KernelSU-ci
+          name: ViVo-KernelSU CI
+          prerelease: true
+          overwrite_files: true
+          files: dist/*-release.apk

@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.WideNavigationRail
 import androidx.compose.material3.WideNavigationRailDefaults
 import androidx.compose.material3.WideNavigationRailItem
+import androidx.compose.material3.WideNavigationRailItemDefaults
 import androidx.compose.material3.WideNavigationRailValue
 import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.runtime.Composable
@@ -34,13 +35,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
 import me.weishu.kernelsu.ui.LocalMainPagerState
+import me.weishu.kernelsu.ui.theme.CustomTextKey
+import me.weishu.kernelsu.ui.theme.LocalBackgroundImagePath
+import me.weishu.kernelsu.ui.theme.customText
 
 @Composable
 fun NavigationRailMaterial(
@@ -51,13 +58,16 @@ fun NavigationRailMaterial(
     if (!fullFeatured) return
 
     val mainPagerState = LocalMainPagerState.current
+    val bottomBarIcons = rememberBottomBarIconPaths()
 
-    val items = listOf(
-        Triple(R.string.home, Icons.Filled.Home, Icons.Outlined.Home),
-        Triple(R.string.superuser, Icons.Filled.Shield, Icons.Outlined.Shield),
-        Triple(R.string.module, Icons.Filled.Extension, Icons.Outlined.Extension),
-        Triple(R.string.settings, Icons.Filled.Settings, Icons.Outlined.Settings)
-    )
+    val items = BottomBarDestination.entries.map { destination ->
+        MaterialRailItem(
+            label = destination.textKey,
+            selectedIcon = destination.selectedIcon(),
+            unselectedIcon = destination.unselectedIcon(),
+            iconPath = bottomBarIcons[destination.key],
+        )
+    }
 
     val settingsRepo = remember { SettingsRepositoryImpl() }
     val state = rememberWideNavigationRailState(
@@ -74,11 +84,12 @@ fun NavigationRailMaterial(
             state.targetValue == WideNavigationRailValue.Expanded
     }
 
+    val hasCustomBackground = LocalBackgroundImagePath.current.isNotEmpty()
     WideNavigationRail(
         modifier = modifier.fillMaxHeight(),
         state = state,
         colors = WideNavigationRailDefaults.colors().copy(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            containerColor = if (hasCustomBackground) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         windowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout).only(
@@ -103,7 +114,7 @@ fun NavigationRailMaterial(
             }
         },
     ) {
-        items.forEachIndexed { index, (label, selectedIcon, unselectedIcon) ->
+        items.forEachIndexed { index, item ->
             val selected = mainPagerState.selectedPage == index
             WideNavigationRailItem(
                 railExpanded = expanded,
@@ -115,13 +126,48 @@ fun NavigationRailMaterial(
                 },
                 icon = {
                     NavigationIconWithBadge(
-                        icon = if (selected) selectedIcon else unselectedIcon,
-                        contentDescription = stringResource(label),
+                        icon = if (selected) item.selectedIcon else item.unselectedIcon,
+                        iconPath = item.iconPath,
+                        contentDescription = customText(item.label),
                         badge = badgeFor(index, navigationBadge),
                     )
                 },
-                label = { Text(stringResource(label)) }
+                label = {
+                    Text(
+                        text = customText(item.label),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+                colors = WideNavigationRailItemDefaults.colors().copy(
+                    selectedIndicatorColor = MaterialTheme.colorScheme.primary,
+                    selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                    // Collapsed rails draw the label below the indicator, expanded ones inside it.
+                    selectedTextColorTopIconPosition = MaterialTheme.colorScheme.primary,
+                    selectedTextColorStartIconPosition = MaterialTheme.colorScheme.onPrimary,
+                ),
             )
         }
     }
+}
+
+private data class MaterialRailItem(
+    val label: CustomTextKey,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector,
+    val iconPath: String?,
+)
+
+private fun BottomBarDestination.selectedIcon(): ImageVector = when (this) {
+    BottomBarDestination.Home -> Icons.Filled.Home
+    BottomBarDestination.SuperUser -> Icons.Filled.Shield
+    BottomBarDestination.Module -> Icons.Filled.Extension
+    BottomBarDestination.Setting -> Icons.Filled.Settings
+}
+
+private fun BottomBarDestination.unselectedIcon(): ImageVector = when (this) {
+    BottomBarDestination.Home -> Icons.Outlined.Home
+    BottomBarDestination.SuperUser -> Icons.Outlined.Shield
+    BottomBarDestination.Module -> Icons.Outlined.Extension
+    BottomBarDestination.Setting -> Icons.Outlined.Settings
 }

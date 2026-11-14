@@ -1,6 +1,7 @@
 package me.weishu.kernelsu.ui.theme
 
 import android.app.Activity
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -13,6 +14,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.materialkolor.dynamiccolor.ColorSpec
 import me.weishu.kernelsu.ui.webui.MonetColorsProvider
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
+import top.yukonga.miuix.kmp.theme.Colors
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeColorSpec
@@ -44,9 +46,12 @@ fun MiuixKernelSUTheme(
 
     val resolvedKeyColor: Color? = when {
         appSettings.keyColor != 0 -> Color(appSettings.keyColor)
-        appSettings.colorMode.isMonet ->
+        appSettings.colorMode.isMonet && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (darkTheme) dynamicDarkColorScheme(context).primary
             else dynamicLightColorScheme(context).primary
+
+        // No system dynamic colors before Android 12.
+        appSettings.colorMode.isMonet -> FallbackSeedColor
 
         else -> null
     }
@@ -76,12 +81,60 @@ fun MiuixKernelSUTheme(
                     isAppearanceLightNavigationBars = !darkTheme
                 }
             }
-            MonetColorsProvider.UpdateCss()
-            CompositionLocalProvider(
-                LocalContentColor provides MiuixTheme.colorScheme.onBackground,
-            ) {
-                content()
+            val baseColors = MiuixTheme.colorScheme
+            val hasCustomBackground = LocalBackgroundImagePath.current.isNotEmpty()
+            // Miuix mutes disabled text to ~38% alpha. Over a translucent card on top of a
+            // custom background that is barely legible, so keep the disabled look but raise
+            // the contrast.
+            //
+            // Always hand a fresh Colors instance to the nested theme. MiuixTheme() copies into
+            // a remembered Colors object and a remembered snapshot here would keep the palette
+            // from before a light/dark, key color or monet change (until the app is restarted).
+            val readableColors = if (hasCustomBackground) {
+                baseColors.copy(
+                    disabledOnSurface = baseColors.onSurface.copy(alpha = 0.85f),
+                    disabledOnSecondary = baseColors.onSecondary.copy(alpha = 0.85f),
+                    disabledOnSecondaryVariant = baseColors.onSurface.copy(alpha = 0.85f),
+                )
+            } else {
+                baseColors.copy()
+            }
+            // Overlay after the background-aware contrast tweak: an explicit theme/user colour
+            // always wins. The tokens are resolved once per theme change, not per frame.
+            val overlaidColors = readableColors.withAppearance(appSettings.appearance?.colorsFor(darkTheme))
+            // Frosted-glass pass: while a theme background is active the whole surface family
+            // goes translucent so cards, dialogs and menus blur the wallpaper. Applied after
+            // the overlay so package colors participate too.
+            val glassColors = if (LocalHasCustomBackground.current) {
+                overlaidColors.withBackgroundGlass(LocalCardBackgroundAlpha.current)
+            } else {
+                overlaidColors
+            }
+            MiuixTheme(glassColors) {
+                MonetColorsProvider.UpdateCss()
+                CompositionLocalProvider(
+                    LocalContentColor provides MiuixTheme.colorScheme.onBackground,
+                ) {
+                    content()
+                }
             }
         }
     )
 }
+
+/**
+ * Translucent card containers over a theme package background.
+ *
+ * Only [Colors.surfaceContainer] (Miuix `Card`'s default color) and
+ * [Colors.surfaceVariant] go translucent. Dialog and popup tokens
+ * ([Colors.background], [Colors.surface], [Colors.surfaceContainerHigh]) stay opaque: a
+ * translucent dialog lets the page underneath show through and destroys the modal layering,
+ * and a translucent popup makes the menu unreadable over a bright wallpaper.
+ */
+private fun Colors.withBackgroundGlass(alpha: Float): Colors = copy(
+    surfaceContainer = surfaceContainer.copy(alpha = alpha),
+    surfaceVariant = surfaceVariant.copy(alpha = alpha),
+    disabledOnSurface = onSurface.copy(alpha = 0.85f),
+    disabledOnSecondary = onSecondary.copy(alpha = 0.85f),
+    disabledOnSecondaryVariant = onSurface.copy(alpha = 0.85f),
+)

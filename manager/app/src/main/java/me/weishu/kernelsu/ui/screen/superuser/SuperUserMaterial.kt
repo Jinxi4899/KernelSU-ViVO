@@ -71,6 +71,8 @@ import me.weishu.kernelsu.ui.component.material.SegmentedColumn
 import me.weishu.kernelsu.ui.component.material.SegmentedItem
 import me.weishu.kernelsu.ui.component.material.SegmentedListItem
 import me.weishu.kernelsu.ui.component.statustag.StatusTag
+import me.weishu.kernelsu.ui.theme.CustomTextKey
+import me.weishu.kernelsu.ui.theme.customText
 import me.weishu.kernelsu.ui.util.ownerNameForUid
 import me.weishu.kernelsu.ui.viewmodel.AppSortType
 
@@ -98,7 +100,7 @@ fun SuperUserPagerMaterial(
         topBar = {
             SearchAppBar(
                 snackbarHostState = snackbarHostState,
-                title = { Text(stringResource(R.string.superuser)) },
+                title = { Text(customText(CustomTextKey.PAGE_SUPERUSER)) },
                 searchText = localSearchText,
                 onSearchTextChange = {
                     localSearchText = it

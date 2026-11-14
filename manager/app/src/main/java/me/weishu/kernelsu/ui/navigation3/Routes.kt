@@ -49,7 +49,50 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
-    data object ColorPalette : Route
+    data object AppearanceOverlay : Route
+
+    @Parcelize
+    @Serializable
+    data object CustomTexts : Route
+
+    @Parcelize
+    @Serializable
+    data class ThemeStore(
+        val themeId: String? = null,
+        val sourceBaseUrl: String? = null,
+    ) : Route
+
+    @Parcelize
+    @Serializable
+    data object ThemeStoreAdaptiveUpload : Route
+
+    @Parcelize
+    @Serializable
+    data object ThemeStoreCurrentUpload : Route
+
+    @Parcelize
+    @Serializable
+    data object ThemeStoreSources : Route
+
+    @Parcelize
+    @Serializable
+    data class ThemeAccount(val tab: String? = null) : Route
+
+    @Parcelize
+    @Serializable
+    data object AdaptiveThemeBuilder : Route
+
+    @Parcelize
+    @Serializable
+    data object AppIcon : Route
+
+    @Parcelize
+    @Serializable
+    data class BackgroundCrop(val sourcePath: String) : Route
+
+    @Parcelize
+    @Serializable
+    data class ColorPalette(val importUri: String? = null) : Route
 
     @Parcelize
     @Serializable

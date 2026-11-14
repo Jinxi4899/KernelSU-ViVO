@@ -1,8 +1,10 @@
 package me.weishu.kernelsu.ui.navigation3
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -15,8 +17,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.core.net.toUri
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.Natives
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
@@ -26,6 +30,8 @@ import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
 import me.weishu.kernelsu.ui.screen.flash.FlashIt
 import me.weishu.kernelsu.ui.screen.scriptrun.ScriptRunArg
 import me.weishu.kernelsu.ui.util.DownloadService
+import me.weishu.kernelsu.ui.util.ThemePackageCrypto
+import me.weishu.kernelsu.ui.util.ThemePackageStorage
 import me.weishu.kernelsu.ui.util.getFileName
 import me.weishu.kernelsu.ui.webui.WebUIActivity
 
@@ -34,6 +40,8 @@ private const val HOST_ACTION = "action"
 private const val HOST_WEBUI = "webui"
 private const val PARAM_ID = "id"
 private const val PARAM_TOKEN = "token"
+private const val THEME_SCHEME = "sukisu-theme"
+private val THEME_ID_PATTERN = Regex("^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
 
 /**
  * Resolved intent action to execute after validation.
@@ -97,8 +105,6 @@ fun getDisplayName(uri: Uri): String {
     return uri.getFileName(ksuApp) ?: uri.lastPathSegment ?: "Unknown"
 }
 
-private val ZIP_MIME_TYPES = setOf("application/zip", "application/x-zip-compressed", "application/x-zip")
-
 /**
  * Resolve an intent snapshot into a [PendingAction].
  * Returns null if the intent carries no recognized action.
@@ -119,8 +125,7 @@ private fun resolveIntent(intent: Intent): PendingAction? {
     }
 
     // File manager: open ZIP
-    val viewUri = intent.data
-    if (viewUri != null && viewUri.scheme == "content" && intent.type in ZIP_MIME_TYPES) {
+    getZipFileViewUri(intent)?.let { viewUri ->
         return PendingAction.InstallModule(
             uri = viewUri,
             displayName = getDisplayName(viewUri),
@@ -135,6 +140,96 @@ private fun resolveIntent(intent: Intent): PendingAction? {
         null -> null
     }
 }
+
+private fun parseThemeStoreLink(intent: Intent): Route.ThemeStore? {
+    if (intent.action != Intent.ACTION_VIEW) return null
+    val uri = intent.data ?: return null
+    if (uri.scheme != THEME_SCHEME || uri.host != "open") return null
+    val id = uri.getQueryParameter("id")?.takeIf { THEME_ID_PATTERN.matches(it) } ?: return null
+    // This URL only selects an already-configured source; it never installs a token or adds a server.
+    val source = uri.getQueryParameter("source")?.takeIf { it.length <= 256 }
+        ?.takeIf { Uri.parse(it).scheme in setOf("http", "https") }
+        ?.trimEnd('/')
+    return Route.ThemeStore(themeId = id, sourceBaseUrl = source)
+}
+
+private suspend fun extractThemePackageUri(context: Context, intent: Intent): Uri? =
+    withContext(Dispatchers.IO) {
+        val uris = linkedSetOf<Uri>()
+
+        fun add(uri: Uri?) {
+            if (uri != null) uris.add(uri)
+        }
+
+        add(intent.data)
+        when (intent.action) {
+            Intent.ACTION_VIEW, Intent.ACTION_SEND -> add(intent.getThemeStreamUri())
+            Intent.ACTION_SEND_MULTIPLE -> intent.getThemeStreamUris()?.forEach(::add)
+        }
+
+        val clipData = intent.clipData
+        if (clipData != null) {
+            for (i in 0 until clipData.itemCount) {
+                add(clipData.getItemAt(i)?.uri)
+            }
+        }
+
+        if (uris.isEmpty()) return@withContext null
+
+        uris.firstOrNull { isThemePackageUri(context, intent, it) }
+            ?: uris.firstOrNull { hasThemeHeader(context, it) }
+    }
+
+private fun Intent.getThemeStreamUri(): Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+} else {
+    @Suppress("DEPRECATION")
+    getParcelableExtra(Intent.EXTRA_STREAM)
+}
+
+private fun Intent.getThemeStreamUris(): List<Uri>? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+} else {
+    @Suppress("DEPRECATION")
+    getParcelableArrayListExtra(Intent.EXTRA_STREAM)
+}
+
+private fun isThemePackageUri(context: Context, intent: Intent, uri: Uri): Boolean {
+    val fileName = uri.getFileName(context) ?: uri.lastPathSegment.orEmpty()
+    val cleanName = fileName.substringBefore('?')
+    if (cleanName.endsWith(".sukisu", ignoreCase = true)) return true
+
+    val declaredType = intent.type
+        ?.substringBefore(';')
+        ?.trim()
+        ?.lowercase()
+    if (declaredType == ThemePackageStorage.THEME_MIME_TYPE) return true
+
+    val resolvedType = runCatching { context.contentResolver.getType(uri) }
+        .getOrNull()
+        ?.substringBefore(';')
+        ?.trim()
+        ?.lowercase()
+    return resolvedType == ThemePackageStorage.THEME_MIME_TYPE
+}
+
+/**
+ * Shared files often arrive as octet-stream with a content URI that has no usable display
+ * name, so filename and MIME checks are not enough. The encrypted package header is stable
+ * and cheap to read, which lets us tell themes apart from module ZIPs before routing.
+ */
+private fun hasThemeHeader(context: Context, uri: Uri): Boolean = runCatching {
+    context.contentResolver.openInputStream(uri)?.use { input ->
+        val header = ByteArray(ThemePackageCrypto.HEADER_SIZE)
+        var read = 0
+        while (read < header.size) {
+            val count = input.read(header, read, header.size - read)
+            if (count < 0) break
+            read += count
+        }
+        ThemePackageCrypto.hasValidHeader(header.copyOf(read))
+    } ?: false
+}.getOrDefault(false)
 
 private fun parseValidatedDeepLink(uri: Uri?): KsuDeepLink? {
     if (uri?.scheme != SCHEME_KSU) return null
@@ -183,6 +278,21 @@ fun IntentDispatcher(intentChannel: ReceiveChannel<Intent>) {
 
     CollectIntentChannel(intentChannel) { intent ->
         if (!isManager) return@CollectIntentChannel
+
+        parseThemeStoreLink(intent)?.let { destination ->
+            navigator.push(destination)
+            return@CollectIntentChannel
+        }
+
+        val themeUri = extractThemePackageUri(context, intent)
+        if (themeUri != null) {
+            // Forward the URI through the route. The appearance destination owns a per-entry
+            // SettingsViewModel, so setting dialog state on the activity-scoped dispatcher
+            // view model would never be observed by the screen that renders the dialog.
+            navigator.push(Route.ColorPalette(importUri = themeUri.toString()))
+            return@CollectIntentChannel
+        }
+
         val action = resolveIntent(intent) ?: return@CollectIntentChannel
 
         when (action) {

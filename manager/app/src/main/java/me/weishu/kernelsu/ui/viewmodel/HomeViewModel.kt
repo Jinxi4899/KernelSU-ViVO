@@ -20,11 +20,17 @@ import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.ui.screen.home.HomeUiState
 import me.weishu.kernelsu.ui.screen.home.SystemInfo
 import me.weishu.kernelsu.ui.screen.home.getManagerVersion
+import me.weishu.kernelsu.ui.util.HomeCardImageStyle
+import me.weishu.kernelsu.ui.util.HomeCardSticker
+import me.weishu.kernelsu.ui.util.HomeLayout
+import me.weishu.kernelsu.ui.util.HomeStatusAlignment
+import me.weishu.kernelsu.ui.util.HomeStatusStyle
 import me.weishu.kernelsu.ui.util.checkNewVersion
 import me.weishu.kernelsu.ui.util.getSELinuxStatusRaw
 import me.weishu.kernelsu.ui.util.module.LatestVersionInfo
 import me.weishu.kernelsu.ui.util.resolveDeviceName
 import me.weishu.kernelsu.ui.util.rootAvailable
+import java.io.File
 
 class HomeViewModel(
     private val settingsRepo: SettingsRepository = SettingsRepositoryImpl()
@@ -43,6 +49,12 @@ class HomeViewModel(
             }
         }
     }
+
+    private fun existingHomeCardImage(): String =
+        settingsRepo.homeCardImagePath.takeIf { it.isNotEmpty() && File(it).isFile } ?: ""
+
+    private fun existingHomeCardStickers(): List<HomeCardSticker> =
+        settingsRepo.homeCardStickers.filter { File(it.path).isFile }
 
     private fun buildState(): HomeUiState {
         val kernelVersion = getKernelVersion()
@@ -70,11 +82,26 @@ class HomeViewModel(
             isSafeMode = Natives.isSafeMode,
             isLateLoadMode = Natives.isLateLoadMode,
             checkUpdateEnabled = settingsRepo.checkUpdate,
+            showFullStatus = settingsRepo.showFullStatus,
+            hideHomeWarnings = settingsRepo.hideHomeWarnings,
+            customHomeTitle = settingsRepo.customHomeTitle,
+            customTexts = settingsRepo.customTexts,
+            homeCardImagePath = existingHomeCardImage(),
+            hideHomeCardStatusText = settingsRepo.hideHomeCardStatusText,
+            hideHomeCardDecoration = settingsRepo.hideHomeCardDecoration,
+            homeCardStickers = existingHomeCardStickers(),
+            homeLayout = HomeLayout.fromValue(settingsRepo.homeLayout),
+            homeStatusAlignment = HomeStatusAlignment.fromValue(settingsRepo.homeStatusAlignment),
+            homeStatusScale = HomeStatusStyle.coerceScale(settingsRepo.homeStatusScale),
+            homePillScale = HomeStatusStyle.coercePillScale(settingsRepo.homePillScale),
+            homeStatusWidthFraction = HomeStatusStyle.coerceWidth(settingsRepo.homeStatusWidthFraction),
+            homeCardImageStyle = HomeCardImageStyle.fromValue(settingsRepo.homeCardImageStyle),
+            showHomeCardImageWithoutBackground = settingsRepo.showHomeCardImageWithoutBackground,
             latestVersionInfo = LatestVersionInfo(),
             currentManagerVersionCode = managerVersion.versionCode,
             systemInfo = SystemInfo(
                 kernelVersion = Os.uname().release,
-                managerVersion = "${managerVersion.versionName} (${managerVersion.versionCode}-${managerUAPIVersion})",
+                managerVersion = BuildConfig.VERSION_DISPLAY,
                 deviceModel = resolveDeviceName(),
                 fingerprint = Build.FINGERPRINT,
                 selinuxStatus = getSELinuxStatusRaw(),

@@ -4,6 +4,10 @@ import androidx.compose.runtime.Immutable
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.util.AppearanceOverlayData
+import me.weishu.kernelsu.ui.util.HomeCardSticker
+import me.weishu.kernelsu.ui.util.ImportedTheme
+import me.weishu.kernelsu.ui.util.ResolvedAppearance
 
 @Immutable
 data class SettingsUiState(
@@ -25,6 +29,59 @@ data class SettingsUiState(
     val pageScale: Float = 1.0f,
     val moduleDescriptionMaxLines: Int = 4,
     val enableWebDebugging: Boolean = false,
+
+    // ---- Theme appearance (SukiSU source names) ----
+    val customBackgroundUri: String = "",
+    val customBackgroundUpdatedAt: Long = 0L,
+    val useSystemWallpaper: Boolean = false,
+    val extractColorFromBackground: Boolean = false,
+    val cardBackgroundAlphaPercent: Int = 60,
+    val customBackgroundBlurPercent: Int = 50,
+    val customBackgroundScrimPercent: Int = -35,
+    val customHomeTitle: String = "",
+    val customTexts: Map<String, String> = emptyMap(),
+    /** BCP-47 language tag, or empty to follow the system language. */
+    val appLanguage: String = "",
+    val homeCardImagePath: String = "",
+    val hideHomeCardStatusText: Boolean = false,
+    val hideHomeCardDecoration: Boolean = false,
+    val homeCardStickers: List<HomeCardSticker> = emptyList(),
+    val bottomBarIcons: Map<String, String> = emptyMap(),
+    val homeLayout: String = "classic",
+    val homeStatusAlignment: String = "start",
+    val homeStatusScale: Float = 1f,
+    val homePillScale: Float = 1f,
+    val homeStatusWidthFraction: Float = 1f,
+    val homeCardImageStyle: String = "banner",
+    val showHomeCardImageWithoutBackground: Boolean = false,
+    val showFullStatus: Boolean = false,
+    val hideHomeWarnings: Boolean = false,
+    val adaptiveAppliedMode: Int = -1,
+    val customAppearanceJson: String = "",
+    val appIconId: String = "default",
+    val appIconDynamicColor: Boolean = false,
+    val enableProgressiveBlur: Boolean = false,
+    val backgroundAppearanceExpanded: Boolean = true,
+    val backgroundSectionExpanded: Boolean = true,
+    val themePackageSectionExpanded: Boolean = true,
+    val appearanceSectionExpanded: Boolean = true,
+    val homeCardSectionExpanded: Boolean = true,
+    val colorsSectionExpanded: Boolean = true,
+    val bottomBarSectionExpanded: Boolean = true,
+    val interactionSectionExpanded: Boolean = true,
+    val detailsSectionExpanded: Boolean = true,
+
+    // ---- Theme package workflows ----
+    val pendingImportTheme: ImportedTheme? = null,
+    val showThemeImportDialog: Boolean = false,
+    val adaptiveThemeActive: Boolean = false,
+    val adaptiveDraftComplete: Boolean = false,
+    val appearance: ResolvedAppearance? = null,
+    val appearanceData: AppearanceOverlayData? = null,
+    val customColorsPresent: Boolean = false,
+    val imageEffectsPresent: Boolean = false,
+    val systemWallpaperPath: String = "",
+    val isSystemWallpaperBusy: Boolean = false,
 
     // Su Compat
     val suCompatStatus: String = "",
@@ -69,6 +126,7 @@ data class SettingsScreenActions(
     val onSetCheckUpdate: (Boolean) -> Unit,
     val onSetCheckModuleUpdate: (Boolean) -> Unit,
     val onOpenTheme: () -> Unit,
+    val onSetLanguage: (String) -> Unit,
     val onSetUiModeIndex: (Int) -> Unit,
     val onOpenProfileTemplate: () -> Unit,
     val onSetSuCompatMode: (Int) -> Unit,

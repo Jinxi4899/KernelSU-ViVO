@@ -9,6 +9,8 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.theme.CustomTextKey
+import me.weishu.kernelsu.ui.theme.customText
 
 @Composable
 fun AboutScreen() {
@@ -16,13 +18,13 @@ fun AboutScreen() {
     val uriHandler = LocalUriHandler.current
     val htmlString = stringResource(
         id = R.string.about_source_code,
-        "<b><a href=\"https://github.com/tiann/KernelSU\">GitHub</a></b>",
+        "<b><a href=\"https://github.com/Jinxi4899/KernelSU-ViVO\">GitHub</a></b>",
         "<b><a href=\"https://t.me/KernelSU\">Telegram</a></b>"
     )
     val state = AboutUiState(
-        title = stringResource(R.string.about),
+        title = customText(CustomTextKey.PAGE_ABOUT),
         appName = stringResource(R.string.app_name),
-        versionName = BuildConfig.VERSION_NAME,
+        versionName = BuildConfig.VERSION_DISPLAY,
         links = extractLinks(htmlString),
     )
     val actions = AboutScreenActions(

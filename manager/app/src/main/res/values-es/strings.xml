@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="home">Inicio</string>
     <string name="home_not_installed">No instalado</string>
@@ -136,4 +136,5 @@
     <string name="profile_flags_desc_no_new_privs">Impide una mayor escalada de privilegios mediante KernelSU dentro del contexto de este perfil root.</string>
     <string name="install_force_backup">Respaldar como imagen original</string>
     <string name="install_force_backup_summary">Asegúrate de que la imagen de arranque seleccionada sea la imagen original</string>
+<string name="settings_module_check_update">Comprobar actualizaciones de módulos</string>
 </resources>
