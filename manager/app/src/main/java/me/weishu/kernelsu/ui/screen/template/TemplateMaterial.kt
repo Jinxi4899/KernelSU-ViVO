@@ -66,6 +66,8 @@ import me.weishu.kernelsu.ui.component.material.SnackBarHost
 import me.weishu.kernelsu.ui.component.material.TopBarBackButton
 import me.weishu.kernelsu.ui.component.material.expressiveTopAppBarColors
 import me.weishu.kernelsu.ui.component.statustag.StatusTag
+import me.weishu.kernelsu.ui.theme.CustomTextKey
+import me.weishu.kernelsu.ui.theme.customText
 
 /**
  * @author weishu
@@ -270,7 +272,7 @@ private fun TopBar(
     val haptic = LocalHapticFeedback.current
     LargeFlexibleTopAppBar(
         title = {
-            Text(stringResource(R.string.settings_profile_template))
+            Text(customText(CustomTextKey.PAGE_TEMPLATE))
         },
         navigationIcon = {
             TopBarBackButton(onClick = onBack)

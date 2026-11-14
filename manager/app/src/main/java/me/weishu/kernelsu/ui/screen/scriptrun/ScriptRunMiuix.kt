@@ -51,6 +51,7 @@ import me.weishu.kernelsu.ui.util.BlurredBar
 import me.weishu.kernelsu.ui.util.ShellHighlightColors
 import me.weishu.kernelsu.ui.util.rememberBlurBackdrop
 import me.weishu.kernelsu.ui.util.rememberShellHighlight
+import me.weishu.kernelsu.ui.theme.LocalBackgroundImagePath
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -58,7 +59,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.Scaffold
+import me.weishu.kernelsu.ui.component.miuix.AppScaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
@@ -84,9 +85,10 @@ internal fun ScriptRunScreenMiuix(
     val enableBlur = LocalEnableBlur.current
     val scrollBehavior = MiuixScrollBehavior()
     val backdrop = rememberBlurBackdrop(enableBlur)
-    val barColor = if (backdrop != null) Color.Transparent else colorScheme.surface
+    val hasCustomBackground = LocalBackgroundImagePath.current.isNotEmpty()
+    val barColor = if (backdrop != null || hasCustomBackground) Color.Transparent else colorScheme.surface
 
-    Scaffold(
+    AppScaffold(
         topBar = {
             TopBar(
                 onBack = actions.onBack,

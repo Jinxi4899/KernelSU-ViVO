@@ -48,6 +48,7 @@ fun ColorPaletteScreen() {
         onSetColorStyle = viewModel::setColorStyle,
         onSetColorSpec = viewModel::setColorSpec,
         onSetEnableBlur = viewModel::setEnableBlur,
+        onSetEnableProgressiveBlur = viewModel::setEnableProgressiveBlur,
         onSetEnableFloatingBottomBar = viewModel::setEnableFloatingBottomBar,
         onSetEnableFloatingBottomBarBlur = viewModel::setEnableFloatingBottomBarBlur,
         onSetEnableNavigationBadge = viewModel::setEnableNavigationBadge,

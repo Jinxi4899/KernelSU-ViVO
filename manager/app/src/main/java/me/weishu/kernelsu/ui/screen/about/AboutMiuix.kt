@@ -63,12 +63,13 @@ import me.weishu.kernelsu.ui.theme.LocalEnableBlur
 import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.util.BlurredBar
 import me.weishu.kernelsu.ui.util.rememberBlurBackdrop
+import me.weishu.kernelsu.ui.theme.LocalBackgroundImagePath
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.Scaffold
+import me.weishu.kernelsu.ui.component.miuix.AppScaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
@@ -111,13 +112,14 @@ fun AboutScreenMiuix(
     val enableBlur = LocalEnableBlur.current
     val barBlurBackdrop = rememberBlurBackdrop(enableBlur)
     val blurActive = barBlurBackdrop != null && scrollProgress == 1f
-    val barColor = if (blurActive) {
+    val hasCustomBackground = LocalBackgroundImagePath.current.isNotEmpty()
+    val barColor = if (blurActive || hasCustomBackground) {
         Color.Transparent
     } else {
         if (scrollProgress == 1f) colorScheme.surface else Color.Transparent
     }
 
-    Scaffold(
+    AppScaffold(
         topBar = {
             BlurredBar(backdrop = barBlurBackdrop, blurActive = blurActive) {
                 SmallTopAppBar(

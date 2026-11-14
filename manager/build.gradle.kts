@@ -14,10 +14,16 @@ extra["androidSourceCompatibility"] = JavaVersion.VERSION_21
 extra["androidTargetCompatibility"] = JavaVersion.VERSION_21
 extra["managerVersionCode"] = getVersionCode()
 extra["managerVersionName"] = getVersionName()
+extra["managerShortHash"] = getGitShortHash()
 
 fun getGitCommitCount(): Int {
     val process = Runtime.getRuntime().exec(arrayOf("git", "rev-list", "--count", "HEAD"))
     return process.inputStream.bufferedReader().use { it.readText().trim().toInt() }
+}
+
+fun getGitShortHash(): String {
+    val process = Runtime.getRuntime().exec(arrayOf("git", "rev-parse", "--short=7", "HEAD"))
+    return process.inputStream.bufferedReader().use { it.readText().trim() }
 }
 
 fun getGitDescribe(): String {
@@ -31,5 +37,9 @@ fun getVersionCode(): Int {
 }
 
 fun getVersionName(): String {
+    // Release builds pass the tag they publish under; git tags are unavailable when the
+    // release workflow creates its tag only after the build, so CI must be authoritative.
+    val override = System.getenv("MANAGER_VERSION_NAME")?.trim().orEmpty()
+    if (override.isNotEmpty()) return override
     return getGitDescribe()
 }

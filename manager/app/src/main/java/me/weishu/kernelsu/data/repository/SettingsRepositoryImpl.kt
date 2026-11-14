@@ -8,11 +8,14 @@ import androidx.core.content.edit
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.topjohnwu.superuser.ShellUtils
+import kotlinx.serialization.json.Json
 import me.weishu.kernelsu.Natives
+import me.weishu.kernelsu.data.model.ThemeStoreSourceConfig
 import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.magica.BootCompletedReceiver
 import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.screen.modulerepo.RepoSort
+import me.weishu.kernelsu.ui.util.HomeCardSticker
 import me.weishu.kernelsu.ui.util.execKsud
 import me.weishu.kernelsu.ui.util.getFeaturePersistValue
 import me.weishu.kernelsu.ui.util.getFeatureValue
@@ -21,6 +24,24 @@ import java.security.SecureRandom
 
 private const val SETTINGS_PREFS = "settings"
 private const val KEY_USE_SOFT_REBOOT = "soft_reboot"
+private const val KEY_CUSTOM_HOME_TITLE = "custom_home_title"
+private const val KEY_CUSTOM_TEXTS = "custom_texts"
+private const val KEY_HOME_CARD_IMAGE_PATH = "home_card_image_path"
+private const val KEY_HIDE_HOME_CARD_STATUS_TEXT = "hide_home_card_status_text"
+private const val KEY_HIDE_HOME_CARD_DECORATION = "hide_home_card_decoration"
+private const val KEY_HOME_CARD_STICKERS = "home_card_stickers"
+private const val KEY_BOTTOM_BAR_ICONS = "bottom_bar_icons"
+private const val KEY_HOME_LAYOUT = "home_layout"
+private const val KEY_HOME_STATUS_ALIGNMENT = "home_status_alignment"
+private const val KEY_HOME_STATUS_SCALE = "home_status_scale"
+private const val KEY_HOME_PILL_SCALE = "home_pill_scale"
+private const val KEY_HOME_STATUS_WIDTH_FRACTION = "home_status_width_fraction"
+private const val KEY_HOME_CARD_IMAGE_STYLE = "home_card_image_style"
+private const val KEY_SHOW_HOME_CARD_IMAGE_WITHOUT_BACKGROUND = "home_card_image_without_background"
+private const val KEY_ADAPTIVE_THEME = "adaptive_theme"
+private const val KEY_ADAPTIVE_APPLIED_MODE = "adaptive_applied_mode"
+private const val KEY_ADAPTIVE_DRAFT = "adaptive_theme_draft"
+private const val KEY_CUSTOM_APPEARANCE = "custom_appearance_json"
 
 /** Prefer soft reboot: always in jailbreak mode, or when the setting is enabled. */
 fun isSoftRebootPreferred(): Boolean =
@@ -36,6 +57,11 @@ class SettingsRepositoryImpl : SettingsRepository {
 
     private val prefs by lazy {
         ksuApp.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
+    }
+
+    private val themeJson = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
     }
 
     override var uiMode: String
@@ -169,6 +195,10 @@ class SettingsRepositoryImpl : SettingsRepository {
         get() = prefs.getBoolean(KEY_USE_SOFT_REBOOT, false)
         set(value) = prefs.edit { putBoolean(KEY_USE_SOFT_REBOOT, value) }
 
+    override var appLanguage: String
+        get() = me.weishu.kernelsu.ui.util.LocaleHelper.getCurrentLanguage(ksuApp)
+        set(value) = me.weishu.kernelsu.ui.util.LocaleHelper.setLanguage(ksuApp, value)
+
     override val intentToken: String
         get() {
         val existing = prefs.getString(INTENT_TOKEN_KEY, null)
@@ -178,6 +208,258 @@ class SettingsRepositoryImpl : SettingsRepository {
         prefs.edit { putString(INTENT_TOKEN_KEY, token) }
         return token
     }
+
+    // ------------------------------------------------------------------
+    // Theme appearance (keys identical to the SukiSU source manager so
+    // imported packages and existing settings resolve unchanged)
+    // ------------------------------------------------------------------
+
+    override var customBackgroundUri: String
+        get() = prefs.getString("custom_bg_uri", "") ?: ""
+        set(value) = prefs.edit { putString("custom_bg_uri", value) }
+
+    override var customBackgroundUpdatedAt: Long
+        get() = prefs.getLong("custom_bg_updated_at", 0L)
+        set(value) = prefs.edit { putLong("custom_bg_updated_at", value) }
+
+    override var useSystemWallpaper: Boolean
+        get() = prefs.getBoolean("use_system_wallpaper", false)
+        set(value) = prefs.edit { putBoolean("use_system_wallpaper", value) }
+
+    override var extractColorFromBackground: Boolean
+        get() = prefs.getBoolean("extract_color_from_background", false)
+        set(value) = prefs.edit { putBoolean("extract_color_from_background", value) }
+
+    override var cardBackgroundAlphaPercent: Int
+        get() = prefs.getInt("card_bg_alpha_percent", 60)
+        set(value) = prefs.edit { putInt("card_bg_alpha_percent", value) }
+
+    override var customBackgroundBlurPercent: Int
+        get() = prefs.getInt("custom_bg_blur_percent", 50)
+        set(value) = prefs.edit { putInt("custom_bg_blur_percent", value) }
+
+    override var customBackgroundScrimPercent: Int
+        get() = prefs.getInt("custom_bg_scrim_percent", -35)
+        set(value) = prefs.edit { putInt("custom_bg_scrim_percent", value) }
+
+    override var backgroundAppearanceExpanded: Boolean
+        get() = prefs.getBoolean("background_appearance_expanded", true)
+        set(value) = prefs.edit { putBoolean("background_appearance_expanded", value) }
+
+    override var backgroundSectionExpanded: Boolean
+        get() = prefs.getBoolean("background_section_expanded", true)
+        set(value) = prefs.edit { putBoolean("background_section_expanded", value) }
+
+    override var themePackageSectionExpanded: Boolean
+        get() = prefs.getBoolean("theme_package_section_expanded", true)
+        set(value) = prefs.edit { putBoolean("theme_package_section_expanded", value) }
+
+    override var appearanceSectionExpanded: Boolean
+        get() = prefs.getBoolean("appearance_section_expanded", true)
+        set(value) = prefs.edit { putBoolean("appearance_section_expanded", value) }
+
+    override var homeCardSectionExpanded: Boolean
+        get() = prefs.getBoolean("home_card_section_expanded", true)
+        set(value) = prefs.edit { putBoolean("home_card_section_expanded", value) }
+
+    override var colorsSectionExpanded: Boolean
+        get() = prefs.getBoolean("colors_section_expanded", true)
+        set(value) = prefs.edit { putBoolean("colors_section_expanded", value) }
+
+    override var bottomBarSectionExpanded: Boolean
+        get() = prefs.getBoolean("bottom_bar_section_expanded", true)
+        set(value) = prefs.edit { putBoolean("bottom_bar_section_expanded", value) }
+
+    override var interactionSectionExpanded: Boolean
+        get() = prefs.getBoolean("interaction_section_expanded", true)
+        set(value) = prefs.edit { putBoolean("interaction_section_expanded", value) }
+
+    override var detailsSectionExpanded: Boolean
+        get() = prefs.getBoolean("details_section_expanded", true)
+        set(value) = prefs.edit { putBoolean("details_section_expanded", value) }
+
+    override var customHomeTitle: String
+        get() = prefs.getString(KEY_CUSTOM_HOME_TITLE, "") ?: ""
+        set(value) = prefs.edit { putString(KEY_CUSTOM_HOME_TITLE, value.trim()) }
+
+    override var customTexts: Map<String, String>
+        get() {
+            val raw = prefs.getString(KEY_CUSTOM_TEXTS, null) ?: return emptyMap()
+            return runCatching { themeJson.decodeFromString<Map<String, String>>(raw) }
+                .getOrDefault(emptyMap())
+        }
+        set(value) = prefs.edit { putString(KEY_CUSTOM_TEXTS, themeJson.encodeToString(value)) }
+
+    override var themeStoreBaseUrl: String
+        get() = prefs.getString("theme_store_base_url", "") ?: ""
+        set(value) = prefs.edit { putString("theme_store_base_url", value.trim()) }
+
+    override var themeStoreToken: String
+        get() = prefs.getString("theme_store_token", "") ?: ""
+        set(value) = prefs.edit { putString("theme_store_token", value.trim()) }
+
+    override var themeStoreAuthorId: String
+        get() = prefs.getString("theme_store_author_id", "") ?: ""
+        set(value) = prefs.edit { putString("theme_store_author_id", value.trim()) }
+
+    override var themeStoreAuthorName: String
+        get() = prefs.getString("theme_store_author_name", "") ?: ""
+        set(value) = prefs.edit { putString("theme_store_author_name", value.trim()) }
+
+    override var themeStoreAdminUrl: String
+        get() = prefs.getString("theme_store_admin_url", "") ?: ""
+        set(value) = prefs.edit { putString("theme_store_admin_url", value.trim()) }
+
+    override var themeStoreExtraSources: List<ThemeStoreSourceConfig>
+        get() {
+            val raw = prefs.getString("theme_store_extra_sources", null) ?: return emptyList()
+            return runCatching {
+                themeJson.decodeFromString<List<ThemeStoreSourceConfig>>(raw)
+            }.getOrDefault(emptyList())
+        }
+        set(value) = prefs.edit {
+            putString("theme_store_extra_sources", themeJson.encodeToString(value))
+        }
+
+    override var themeStoreUploadSource: String
+        get() = prefs.getString("theme_store_upload_source", "") ?: ""
+        set(value) = prefs.edit { putString("theme_store_upload_source", value.trim()) }
+
+    override var themeStoreGridLayout: Boolean
+        get() = prefs.getBoolean("theme_store_grid_layout", true)
+        set(value) = prefs.edit { putBoolean("theme_store_grid_layout", value) }
+
+    override var homeCardImagePath: String
+        get() = prefs.getString(KEY_HOME_CARD_IMAGE_PATH, "") ?: ""
+        set(value) = prefs.edit { putString(KEY_HOME_CARD_IMAGE_PATH, value) }
+
+    override var hideHomeCardStatusText: Boolean
+        get() = prefs.getBoolean(KEY_HIDE_HOME_CARD_STATUS_TEXT, false)
+        set(value) = prefs.edit { putBoolean(KEY_HIDE_HOME_CARD_STATUS_TEXT, value) }
+
+    override var hideHomeCardDecoration: Boolean
+        get() = prefs.getBoolean(KEY_HIDE_HOME_CARD_DECORATION, false)
+        set(value) = prefs.edit { putBoolean(KEY_HIDE_HOME_CARD_DECORATION, value) }
+
+    override var homeCardStickers: List<HomeCardSticker>
+        get() {
+            val raw = prefs.getString(KEY_HOME_CARD_STICKERS, null) ?: return emptyList()
+            return runCatching {
+                themeJson.decodeFromString<List<HomeCardSticker>>(raw)
+            }.getOrDefault(emptyList()).take(HomeCardSticker.MAX_COUNT)
+        }
+        set(value) = prefs.edit {
+            putString(
+                KEY_HOME_CARD_STICKERS,
+                themeJson.encodeToString(value.take(HomeCardSticker.MAX_COUNT)),
+            )
+        }
+
+    override var bottomBarIcons: Map<String, String>
+        get() {
+            val raw = prefs.getString(KEY_BOTTOM_BAR_ICONS, null) ?: return emptyMap()
+            return runCatching { themeJson.decodeFromString<Map<String, String>>(raw) }
+                .getOrDefault(emptyMap())
+                .filterValues { it.isNotBlank() }
+        }
+        set(value) = prefs.edit {
+            putString(
+                KEY_BOTTOM_BAR_ICONS,
+                themeJson.encodeToString(value.filterValues { it.isNotBlank() }),
+            )
+        }
+
+    override var homeLayout: String
+        get() = prefs.getString(KEY_HOME_LAYOUT, "classic") ?: "classic"
+        set(value) = prefs.edit { putString(KEY_HOME_LAYOUT, value) }
+
+    override var homeStatusAlignment: String
+        get() = prefs.getString(KEY_HOME_STATUS_ALIGNMENT, "start") ?: "start"
+        set(value) = prefs.edit { putString(KEY_HOME_STATUS_ALIGNMENT, value) }
+
+    override var homeStatusScale: Float
+        get() = prefs.getFloat(KEY_HOME_STATUS_SCALE, 1f).coerceIn(0.6f, 2f)
+        set(value) = prefs.edit { putFloat(KEY_HOME_STATUS_SCALE, value.coerceIn(0.6f, 2f)) }
+
+    override var homePillScale: Float
+        get() = prefs.getFloat(KEY_HOME_PILL_SCALE, 1f).coerceIn(0.6f, 2f)
+        set(value) = prefs.edit { putFloat(KEY_HOME_PILL_SCALE, value.coerceIn(0.6f, 2f)) }
+
+    override var homeStatusWidthFraction: Float
+        get() = prefs.getFloat(KEY_HOME_STATUS_WIDTH_FRACTION, 1f).coerceIn(0.4f, 1f)
+        set(value) = prefs.edit {
+            putFloat(KEY_HOME_STATUS_WIDTH_FRACTION, value.coerceIn(0.4f, 1f))
+        }
+
+    override var homeCardImageStyle: String
+        get() = prefs.getString(KEY_HOME_CARD_IMAGE_STYLE, "banner") ?: "banner"
+        set(value) = prefs.edit { putString(KEY_HOME_CARD_IMAGE_STYLE, value) }
+
+    override var showHomeCardImageWithoutBackground: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_HOME_CARD_IMAGE_WITHOUT_BACKGROUND, false)
+        set(value) = prefs.edit {
+            putBoolean(KEY_SHOW_HOME_CARD_IMAGE_WITHOUT_BACKGROUND, value)
+        }
+
+    override var adaptiveThemeJson: String
+        get() = prefs.getString(KEY_ADAPTIVE_THEME, "") ?: ""
+        set(value) = prefs.edit { putString(KEY_ADAPTIVE_THEME, value) }
+
+    override var adaptiveAppliedMode: Int
+        get() = prefs.getInt(KEY_ADAPTIVE_APPLIED_MODE, -1)
+        set(value) = prefs.edit { putInt(KEY_ADAPTIVE_APPLIED_MODE, value) }
+
+    override var adaptiveDraftJson: String
+        get() = prefs.getString(KEY_ADAPTIVE_DRAFT, "") ?: ""
+        set(value) = prefs.edit { putString(KEY_ADAPTIVE_DRAFT, value) }
+
+    override var customAppearanceJson: String
+        get() = prefs.getString(KEY_CUSTOM_APPEARANCE, "") ?: ""
+        set(value) = prefs.edit { putString(KEY_CUSTOM_APPEARANCE, value) }
+
+    override var appIconId: String
+        get() = prefs.getString("app_icon_id", "default") ?: "default"
+        set(value) = prefs.edit { putString("app_icon_id", value) }
+
+    override var appIconDynamicColor: Boolean
+        get() = prefs.getBoolean("app_icon_dynamic_color", false)
+        set(value) = prefs.edit { putBoolean("app_icon_dynamic_color", value) }
+
+    override var moduleSortWebUiFirst: Boolean
+        get() = prefs.getBoolean("module_sort_webui_first", false)
+        set(value) = prefs.edit { putBoolean("module_sort_webui_first", value) }
+
+    override var moduleSortZygiskFirst: Boolean
+        get() = prefs.getBoolean("module_sort_zygisk_first", false)
+        set(value) = prefs.edit { putBoolean("module_sort_zygisk_first", value) }
+
+    override var moduleSortMetamoduleFirst: Boolean
+        get() = prefs.getBoolean("module_sort_metamodule_first", false)
+        set(value) = prefs.edit { putBoolean("module_sort_metamodule_first", value) }
+
+    override var moduleSortNameOrder: String
+        get() = prefs.getString("module_sort_name_order", "DEFAULT") ?: "DEFAULT"
+        set(value) = prefs.edit { putString("module_sort_name_order", value) }
+
+    override var moduleSortManual: Boolean
+        get() = prefs.getBoolean("module_sort_manual", false)
+        set(value) = prefs.edit { putBoolean("module_sort_manual", value) }
+
+    override var moduleManualOrder: String
+        get() = prefs.getString("module_manual_order", "") ?: ""
+        set(value) = prefs.edit { putString("module_manual_order", value) }
+
+    override var showFullStatus: Boolean
+        get() = prefs.getBoolean("show_fingerprint", true)
+        set(value) = prefs.edit { putBoolean("show_fingerprint", value) }
+
+    override var hideHomeWarnings: Boolean
+        get() = prefs.getBoolean("hide_home_warnings", false)
+        set(value) = prefs.edit { putBoolean("hide_home_warnings", value) }
+
+    override var enableProgressiveBlur: Boolean
+        get() = prefs.getBoolean("enable_progressive_blur", false)
+        set(value) = prefs.edit { putBoolean("enable_progressive_blur", value) }
 
     override suspend fun getSuCompatStatus(): String = getFeatureStatus("su_compat")
 

@@ -1,27 +1,13 @@
 name: Clippy check
 
 on:
-  push:
-    branches:
-      - main
-      - dev
-    paths:
-      - '.github/workflows/clippy.yml'
-      - 'userspace/**'
-  pull_request:
-    branches:
-      - main
-      - dev
-    paths:
-      - '.github/workflows/clippy.yml'
-      - 'userspace/**'
-
+  workflow_dispatch:
 env:
   RUSTFLAGS: '-Dwarnings'
 
 jobs:
   clippy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 

@@ -117,7 +117,9 @@ import me.weishu.kernelsu.ui.component.material.expressiveTopAppBarColors
 import me.weishu.kernelsu.ui.component.statustag.StatusTag
 import me.weishu.kernelsu.ui.screen.module.ExpandableDescriptionText
 import me.weishu.kernelsu.ui.screen.scriptrun.lastRunText
+import me.weishu.kernelsu.ui.theme.CustomTextKey
 import me.weishu.kernelsu.ui.theme.LocalModuleDescriptionMaxLines
+import me.weishu.kernelsu.ui.theme.customText
 import me.weishu.kernelsu.ui.util.isDownloadAvailable
 import me.weishu.kernelsu.ui.util.rememberContentReady
 import top.yukonga.miuix.kmp.utils.PagerNavigationSpringSpec
@@ -142,7 +144,7 @@ fun ModuleRepoScreenMaterial(
         topBar = {
             SearchAppBar(
                 snackbarHostState = snackbarHostState,
-                title = { Text(text = stringResource(R.string.module_repos)) },
+                title = { Text(text = customText(CustomTextKey.PAGE_MODULE_REPO)) },
                 searchText = state.searchStatus.searchText,
                 onSearchTextChange = actions.onSearchTextChange,
                 onClearClick = actions.onClearSearch,

@@ -1,11 +1,35 @@
 package me.weishu.kernelsu.ui.component.bottombar
 
+import android.os.Build
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Home
@@ -17,63 +41,254 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ShortNavigationBar
-import androidx.compose.material3.ShortNavigationBarItem
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import me.weishu.kernelsu.Natives
-import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.LocalMainPagerState
+import me.weishu.kernelsu.ui.component.FloatingBottomBar
+import me.weishu.kernelsu.ui.component.FloatingBottomBarItem
+import me.weishu.kernelsu.ui.theme.CustomTextKey
+import me.weishu.kernelsu.ui.theme.LocalEnableFloatingBottomBarBlur
+import me.weishu.kernelsu.ui.theme.LocalEnableProgressiveBlur
+import me.weishu.kernelsu.ui.theme.backgroundAwareColor
+import me.weishu.kernelsu.ui.theme.customText
+import me.weishu.kernelsu.ui.util.rememberProgressiveBarBlurModifier
+import top.yukonga.miuix.kmp.blur.Backdrop
+import top.yukonga.miuix.kmp.blur.ProgressiveBlur
+import top.yukonga.miuix.kmp.shader.isRuntimeShaderSupported
+import top.yukonga.miuix.kmp.theme.LocalContentColor as MiuixLocalContentColor
 
 @Composable
-fun BottomBarMaterial(navigationBadge: NavigationBadgeState) {
+fun BottomBarMaterial(
+    backdrop: Backdrop,
+    navigationBadge: NavigationBadgeState,
+    modifier: Modifier = Modifier,
+) {
     val fullFeatured = Natives.isFullFeatured()
     if (!fullFeatured) return
 
     val mainPagerState = LocalMainPagerState.current
+    val bottomBarIcons = rememberBottomBarIconPaths()
+    val progressiveBlur = LocalEnableProgressiveBlur.current && isRuntimeShaderSupported()
 
     val items = listOf(
-        Triple(R.string.home, Icons.Filled.Home, Icons.Outlined.Home),
-        Triple(R.string.superuser, Icons.Filled.Shield, Icons.Outlined.Shield),
-        Triple(R.string.module, Icons.Filled.Extension, Icons.Outlined.Extension),
-        Triple(R.string.settings, Icons.Filled.Settings, Icons.Outlined.Settings)
+        MaterialNavItem(CustomTextKey.PAGE_HOME, Icons.Filled.Home, Icons.Outlined.Home, bottomBarIcons["home"]),
+        MaterialNavItem(CustomTextKey.PAGE_SUPERUSER, Icons.Filled.Shield, Icons.Outlined.Shield, bottomBarIcons["superuser"]),
+        MaterialNavItem(CustomTextKey.PAGE_MODULES, Icons.Filled.Extension, Icons.Outlined.Extension, bottomBarIcons["module"]),
+        MaterialNavItem(CustomTextKey.PAGE_SETTINGS, Icons.Filled.Settings, Icons.Outlined.Settings, bottomBarIcons["setting"])
     )
 
-    ShortNavigationBar(
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        windowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout).only(
-            WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
+    if (LocalEnableFloatingBottomBarBlur.current && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        LiquidBottomBarMaterial(
+            backdrop = backdrop,
+            items = items,
+            navigationBadge = navigationBadge,
+            modifier = modifier,
+            progressiveBlur = progressiveBlur,
         )
+        return
+    }
+
+    // Pages already reserve bottomInnerPadding, so the pill floats over scrolled content.
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(
+                WindowInsets.systemBars.union(WindowInsets.displayCutout).only(
+                    WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
+                )
+            )
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        items.forEachIndexed { index, (label, selectedIcon, unselectedIcon) ->
+        val pillColor = backgroundAwareColor(MaterialTheme.colorScheme.surfaceContainerHighest)
+        val progressiveModifier = if (progressiveBlur) {
+            rememberProgressiveBarBlurModifier(
+                backdrop = backdrop,
+                gradient = ProgressiveBlur.Bottom,
+                tint = MaterialTheme.colorScheme.surfaceContainerHighest,
+                tintAlpha = 0.2f,
+                shape = CircleShape,
+            )
+        } else {
+            Modifier
+        }
+        Surface(
+            modifier = Modifier.widthIn(max = 480.dp).then(progressiveModifier),
+            shape = CircleShape,
+            // A translucent sheet lets the progressive blur below the pill stay visible while
+            // keeping the labels readable; the blur carries the edge gradient.
+            color = if (progressiveBlur) pillColor.copy(alpha = 0.5f) else pillColor,
+            shadowElevation = 6.dp,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .padding(horizontal = 8.dp)
+                    .selectableGroup(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                items.forEachIndexed { index, item ->
+                    val selected = mainPagerState.selectedPage == index
+                    FloatingNavItem(
+                        selected = selected,
+                        label = customText(item.label),
+                        icon = if (selected) item.selectedIcon else item.unselectedIcon,
+                        iconPath = item.iconPath,
+                        badge = badgeFor(index, navigationBadge),
+                        progressiveBlur = progressiveBlur,
+                        onClick = {
+                            if (!selected) {
+                                mainPagerState.animateToPage(index)
+                            }
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+// Liquid glass variant: reuses the Miuix FloatingBottomBar (lens, highlight, draggable indicator)
+// with Material colors.
+@Composable
+private fun LiquidBottomBarMaterial(
+    backdrop: Backdrop,
+    items: List<MaterialNavItem>,
+    navigationBadge: NavigationBadgeState,
+    modifier: Modifier,
+    progressiveBlur: Boolean = false,
+) {
+    val mainPagerState = LocalMainPagerState.current
+    val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        .let { inset -> if (inset != 0.dp) 8.dp + inset else 28.dp }
+
+    FloatingBottomBar(
+        modifier = modifier
+            .pointerInput(Unit) {
+                detectTapGestures { }
+            }
+            .padding(start = 28.dp, end = 28.dp, bottom = bottomPadding),
+        selectedIndex = mainPagerState.selectedPage,
+        onSelected = { mainPagerState.animateToPage(it) },
+        backdrop = backdrop,
+        tabsCount = items.size,
+        isBlurEnabled = true,
+        progressiveBlur = progressiveBlur,
+        accentColor = MaterialTheme.colorScheme.primary,
+        tabContentColor = MaterialTheme.colorScheme.onSurface,
+        surfaceContainer = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) { activateTab ->
+        items.forEachIndexed { index, item ->
             val selected = mainPagerState.selectedPage == index
-            ShortNavigationBarItem(
+            FloatingBottomBarItem(
                 selected = selected,
-                onClick = {
-                    if (!selected) {
-                        mainPagerState.animateToPage(index)
-                    }
-                },
-                icon = {
+                onClick = { activateTab(index) },
+                modifier = Modifier.defaultMinSize(minWidth = 76.dp)
+            ) {
+                // The bar recolors its indicator copy through the Miuix content color; forward it to Material.
+                CompositionLocalProvider(LocalContentColor provides MiuixLocalContentColor.current) {
                     NavigationIconWithBadge(
-                        icon = if (selected) selectedIcon else unselectedIcon,
-                        contentDescription = stringResource(label),
+                        icon = if (selected) item.selectedIcon else item.unselectedIcon,
+                        iconPath = item.iconPath,
+                        contentDescription = customText(item.label),
                         badge = badgeFor(index, navigationBadge),
                     )
-                },
-                label = {
                     Text(
-                        stringResource(label),
+                        text = customText(item.label),
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp,
                         maxLines = 1,
+                        softWrap = false,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+            }
+        }
+    }
+}
+
+private data class MaterialNavItem(
+    val label: CustomTextKey,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector,
+    val iconPath: String?,
+)
+
+@Composable
+private fun FloatingNavItem(
+    selected: Boolean,
+    label: String,
+    icon: ImageVector,
+    iconPath: String?,
+    badge: NavBadge?,
+    progressiveBlur: Boolean = false,
+    onClick: () -> Unit,
+) {
+    // With the progressive pill the unselected items must not paint an opaque capsule, otherwise
+    // they would punch solid holes through the blur.
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            selected -> MaterialTheme.colorScheme.primary
+            progressiveBlur -> Color.Transparent
+            else -> MaterialTheme.colorScheme.surfaceContainerHighest
+        },
+        label = "nav_item_container"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+        label = "nav_item_content"
+    )
+
+    CompositionLocalProvider(LocalContentColor provides contentColor) {
+        Row(
+            modifier = Modifier
+                .height(48.dp)
+                .clip(CircleShape)
+                .background(containerColor)
+                .selectable(selected = selected, onClick = onClick, role = Role.Tab)
+                .animateContentSize()
+                .padding(horizontal = if (selected) 16.dp else 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            NavigationIconWithBadge(
+                icon = icon,
+                iconPath = iconPath,
+                contentDescription = if (selected) null else label,
+                badge = badge,
             )
+            AnimatedVisibility(
+                visible = selected,
+                enter = fadeIn() + expandHorizontally(),
+                exit = fadeOut() + shrinkHorizontally(),
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -83,6 +298,7 @@ internal fun NavigationIconWithBadge(
     icon: ImageVector,
     contentDescription: String?,
     badge: NavBadge?,
+    iconPath: String? = null,
 ) {
     if (badge != null) {
         BadgedBox(
@@ -101,9 +317,19 @@ internal fun NavigationIconWithBadge(
                 }
             }
         ) {
-            Icon(icon, contentDescription)
+            BottomBarIconContent(
+                icon = icon,
+                iconPath = iconPath,
+                contentDescription = contentDescription,
+                tint = LocalContentColor.current,
+            )
         }
     } else {
-        Icon(icon, contentDescription)
+        BottomBarIconContent(
+            icon = icon,
+            iconPath = iconPath,
+            contentDescription = contentDescription,
+            tint = LocalContentColor.current,
+        )
     }
 }

@@ -11,11 +11,11 @@ const projectJsonLd = JSON.stringify({
     description: 'An open-source, kernel-based root solution for Android GKI devices.',
     url: `${SITE_URL}/`,
     image: `${SITE_URL}/logo.png`,
-    codeRepository: 'https://github.com/tiann/KernelSU',
+    codeRepository: 'https://github.com/Jinxi4899/KernelSU-ViVO',
     license: ['https://www.gnu.org/licenses/gpl-2.0.html', 'https://www.gnu.org/licenses/gpl-3.0.html'],
     programmingLanguage: ['C', 'Rust', 'Kotlin'],
     runtimePlatform: 'Android',
-    sameAs: ['https://github.com/tiann/KernelSU', 'https://t.me/KernelSU'],
+    sameAs: ['https://github.com/Jinxi4899/KernelSU-ViVO', 'https://t.me/KernelSU'],
 })
 
 export function transformPageData(pageData: PageData) {

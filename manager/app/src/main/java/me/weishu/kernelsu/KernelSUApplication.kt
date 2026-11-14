@@ -1,6 +1,7 @@
 package me.weishu.kernelsu
 
 import android.app.Application
+import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.os.UserManager
@@ -9,6 +10,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import me.weishu.kernelsu.data.repository.SettingsRepositoryImpl
+import me.weishu.kernelsu.ui.util.BuiltinAppIcons
 import me.weishu.kernelsu.ui.viewmodel.SuperUserViewModel
 import okhttp3.Cache
 import okhttp3.OkHttpClient
@@ -34,6 +36,10 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
     lateinit var okhttpClient: OkHttpClient
     private val appViewModelStore by lazy { ViewModelStore() }
 
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(me.weishu.kernelsu.ui.util.LocaleHelper.wrap(base))
+    }
+
     private fun isUserUnlocked(): Boolean =
         getSystemService(UserManager::class.java)?.isUserUnlocked == true
 
@@ -43,6 +49,16 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
 
         if (!isUserUnlocked()) {
             return
+        }
+
+        SettingsRepositoryImpl().let { settings ->
+            // Only touch launcher components when the state actually drifted; re-applying an
+            // unchanged alias can restart the process on some ROMs right as we are starting.
+            BuiltinAppIcons.applyIfNeeded(
+                context = this,
+                icon = BuiltinAppIcons.find(settings.appIconId),
+                dynamicColor = settings.appIconDynamicColor,
+            )
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
