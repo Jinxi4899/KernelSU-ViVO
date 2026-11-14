@@ -53,3 +53,6 @@ data class StatusMeta(
     val bg: Color,
     val fg: Color
 )
+
+/** Client-side row filter for the superuser list, matching the source manager. */
+internal enum class AppFilter { All, Root, Custom }

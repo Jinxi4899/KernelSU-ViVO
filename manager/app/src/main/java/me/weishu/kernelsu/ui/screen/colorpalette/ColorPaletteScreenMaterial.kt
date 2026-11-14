@@ -1536,7 +1536,7 @@ fun ColorPaletteScreenMaterial(
                     TextButton(
                         onClick = {
                             showResetDialog = false
-                            settingsViewModel.restoreDefaultTheme()
+                            settingsViewModel.resetBackgroundAppearance()
                         }
                     ) {
                         Text(stringResource(R.string.theme_reset))
@@ -1562,7 +1562,7 @@ fun ColorPaletteScreenMaterial(
                             settingsViewModel.restoreDefaultTheme()
                         }
                     ) {
-                        Text(stringResource(R.string.theme_clear_all))
+                        Text(stringResource(R.string.theme_clear_all_confirm))
                     }
                 },
                 dismissButton = {

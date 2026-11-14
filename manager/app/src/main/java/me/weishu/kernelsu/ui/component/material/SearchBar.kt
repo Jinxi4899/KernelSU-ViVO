@@ -48,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -55,6 +56,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import me.weishu.kernelsu.ui.theme.LocalBackgroundImagePath
+import me.weishu.kernelsu.ui.theme.backgroundAwareColor
 import top.yukonga.miuix.kmp.nav.gesture.WindowNavigationEventBridge
 
 @Composable
@@ -180,13 +183,21 @@ fun SearchAppBar(
         }
     }
 
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
+    // A theme package background must stay visible behind the large bar; only the search field
+    // keeps a translucent surface so the wallpaper does not swallow its outline.
+    val hasCustomBackground = LocalBackgroundImagePath.current.isNotEmpty()
+    val barContainer = if (hasCustomBackground) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer
+
+    Surface(color = barContainer) {
         Column(
             modifier = Modifier.fillMaxWidth()
         ) {
             LargeFlexibleTopAppBar(
                 title = title,
-                colors = expressiveTopAppBarColors(),
+                colors = expressiveTopAppBarColors(
+                    containerColor = barContainer,
+                    scrolledContainerColor = barContainer,
+                ),
                 navigationIcon = { if (navigationIcon != null) navigationIcon() },
                 actions = { if (actions != null) actions() },
                 windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
@@ -202,7 +213,9 @@ fun SearchAppBar(
 
                 state = searchBarState,
                 inputField = inputField,
-                colors = SearchBarDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
+                colors = SearchBarDefaults.colors(
+                    containerColor = backgroundAwareColor(MaterialTheme.colorScheme.surfaceContainerHighest),
+                ),
             )
         }
     }

@@ -328,11 +328,12 @@ class ThemePackageManager(
             (data.customTexts ?: emptyMap()).forEach { (key, value) ->
                 val group = CustomTextKey.fromKey(key)?.group
                 if (group != null && group in selectedGroups && value.isNotBlank()) {
-                    textsMap[key] = value
+                    textsMap[key] = rebrandThemeText(value)
                 }
             }
             if (CustomTextGroup.HOME in selectedGroups) {
-                val homeTitle = data.customHomeTitle ?: textsMap[CustomTextKey.HOME_TITLE.key]
+                val homeTitle = (data.customHomeTitle ?: textsMap[CustomTextKey.HOME_TITLE.key])
+                    ?.let(::rebrandThemeText)
                 if (!homeTitle.isNullOrBlank()) {
                     textsMap[CustomTextKey.HOME_TITLE.key] = homeTitle
                     repo.customHomeTitle = homeTitle
@@ -1189,4 +1190,17 @@ class ThemePackageManager(
         val mode = ColorMode.fromValue(repo.themeMode)
         return mode.isDark || (mode.isSystem && isSystemDarkMode())
     }
+
+    // Store packages are built for the source manager and may embed its brand in user-facing
+    // words (home title, page labels and therefore the bottom bar tabs, settings rows). Rewrite
+    // that brand to this manager's name at apply time; every other word and every key is kept.
+    private val brandUltraPattern = Regex("(?i)sukisu\\s*ultra")
+    private val brandPattern = Regex("(?i)sukisu")
+
+    private fun rebrandThemeText(text: String): String =
+        if (!brandPattern.containsMatchIn(text)) {
+            text
+        } else {
+            brandPattern.replace(brandUltraPattern.replace(text, "KernelSU"), "KernelSU")
+        }
 }

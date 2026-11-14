@@ -44,6 +44,13 @@ jobs:
     steps:
     - name: Checkout source code
       uses: actions/checkout@v7
+      with:
+        # The kernel module derives KSU_VERSION from `git rev-list --count HEAD`
+        # (Kbuild: 30000 + commit count), exactly like the manager's versionCode.
+        # A shallow checkout makes that count 1, so the bundled LKM would forever
+        # look older than the manager and the home page would always offer an
+        # "LKM update" that changes nothing. Fetch the full history here.
+        fetch-depth: 0
 
     - name: Inject vivo vermagic
       if: ${{ inputs.vivo }}

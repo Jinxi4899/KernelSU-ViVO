@@ -28,6 +28,12 @@
     <string name="module_failed_to_enable">无法启用模块：%s</string>
     <string name="module_failed_to_disable">无法禁用模块：%s</string>
     <string name="module_empty">没有安装模块</string>
+    <string name="module_summary">%1$d 个已启用 · %2$d 个可更新</string>
+    <string name="superuser_granted_summary">已授权 %1$d / %2$d 个应用</string>
+    <string name="superuser_filter_all">全部</string>
+    <string name="superuser_filter_system">系统应用</string>
+    <string name="splash_tagline">基于内核的 Root 方案</string>
+    <string name="splash_motto">你所喜欢的，你允许；你所允许的，你管理。</string>
     <string name="module">模块</string>
     <string name="module_sort_action_first">可执行优先</string>
     <string name="module_sort_enabled_first">已启用优先</string>
@@ -955,7 +961,8 @@
 <string name="theme_import_summary">应用由 ViVo-KernelSU 导出的 .sukisu 主题包</string>
 <string name="theme_reset">恢复默认</string>
 <string name="theme_reset_summary">重置卡片不透明度、背景模糊和遮罩</string>
-<string name="theme_clear_all">清除全部外观</string>
+<string name="theme_clear_all">清除全部</string>
+<string name="theme_clear_all_confirm">清除全部</string>
 <string name="theme_clear_all_summary">移除全部背景、状态卡图片、贴纸和自定义文字，配色与图标恢复默认</string>
 <string name="theme_clear_all_confirm_title">清除全部外观？</string>
 <string name="theme_clear_all_confirm_message">自定义背景、首页状态卡背景图、全部贴纸和自定义文案会被删除，主题配色、莫奈、强调色与应用图标将恢复默认。此操作无法撤销。</string>

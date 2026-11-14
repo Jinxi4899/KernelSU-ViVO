@@ -74,10 +74,12 @@ fun checkNewVersion(): LatestVersionInfo {
                         continue
                     }
 
-                    val regex = Regex("v(.+?)_(\\d+)-")
+                    // Archives are named <name>_<version>_<versionCode>-release.apk; the version
+                    // segment may or may not carry a leading "v" depending on the release tag,
+                    // so anchor on the trailing versionCode instead.
+                    val regex = Regex("_(\\d+)-release\\.apk$")
                     val matchResult = regex.find(name) ?: continue
-                    matchResult.groupValues[1]
-                    val versionCode = matchResult.groupValues[2].toInt()
+                    val versionCode = matchResult.groupValues[1].toInt()
                     val downloadUrl = asset.getString("browser_download_url")
 
                     return LatestVersionInfo(

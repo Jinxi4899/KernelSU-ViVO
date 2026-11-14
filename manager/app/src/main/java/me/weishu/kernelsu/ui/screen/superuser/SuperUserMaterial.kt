@@ -5,9 +5,11 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -20,6 +22,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.automirrored.outlined.Article
@@ -29,10 +33,13 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.CheckableDropdownMenuItem
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuPopup
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.SelectableDropdownMenuItem
@@ -51,6 +58,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -91,6 +99,15 @@ fun SuperUserPagerMaterial(
     var localSearchText by remember { mutableStateOf(uiState.searchStatus.searchText) }
     LaunchedEffect(uiState.searchStatus.searchText) {
         localSearchText = uiState.searchStatus.searchText
+    }
+
+    var filter by rememberSaveable { mutableStateOf(AppFilter.All) }
+    val visibleApps = remember(uiState.groupedApps, filter) {
+        when (filter) {
+            AppFilter.All -> uiState.groupedApps
+            AppFilter.Root -> uiState.groupedApps.filter { it.anyAllowSu }
+            AppFilter.Custom -> uiState.groupedApps.filter { it.anyCustom }
+        }
     }
 
     val haptic = LocalHapticFeedback.current
@@ -333,13 +350,14 @@ fun SuperUserPagerMaterial(
         ) {
             val expandedSearchUids = remember { mutableStateOf(setOf<Int>()) }
 
-            val latestGroupedApps = rememberUpdatedState(uiState.groupedApps)
+            val latestGroupedApps = rememberUpdatedState(visibleApps)
             val latestRefreshing = rememberUpdatedState(uiState.isRefreshing)
             ScrollToTopOnChange(
                 listState,
                 uiState.sortConfig,
                 uiState.showSystemApps,
                 uiState.showOnlyPrimaryUserApps,
+                filter,
                 refreshTick.intValue,
                 isBusy = { latestRefreshing.value },
             ) { latestGroupedApps.value }
@@ -357,7 +375,17 @@ fun SuperUserPagerMaterial(
                     bottom = 16.dp + bottomInnerPadding
                 ),
             ) {
-                itemsIndexed(uiState.groupedApps, key = { _, item -> item.uid }) { index, group ->
+                item(key = "superuser_header", contentType = "header") {
+                    SuperUserHeader(
+                        grantedCount = uiState.groupedApps.count { it.anyAllowSu },
+                        totalCount = uiState.groupedApps.size,
+                        filter = filter,
+                        onFilterChange = { filter = it },
+                        showSystemApps = uiState.showSystemApps,
+                        onToggleShowSystemApps = actions.onToggleShowSystemApps,
+                    )
+                }
+                itemsIndexed(visibleApps, key = { _, item -> item.uid }) { index, group ->
                     val expanded = expandedSearchUids.value.contains(group.uid)
                     val onToggleExpand = {
                         if (group.apps.size > 1) {
@@ -394,6 +422,60 @@ fun SuperUserPagerMaterial(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SuperUserHeader(
+    grantedCount: Int,
+    totalCount: Int,
+    filter: AppFilter,
+    onFilterChange: (AppFilter) -> Unit,
+    showSystemApps: Boolean,
+    onToggleShowSystemApps: () -> Unit,
+) {
+    val haptic = LocalHapticFeedback.current
+
+    @Composable
+    fun Chip(selected: Boolean, label: String, onClick: () -> Unit) {
+        FilterChip(
+            selected = selected,
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                onClick()
+            },
+            label = { Text(label) },
+            shape = CircleShape,
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = colorScheme.inverseSurface,
+                selectedLabelColor = colorScheme.inverseOnSurface,
+            ),
+        )
+    }
+
+    Column(
+        modifier = Modifier.padding(bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.superuser_granted_summary, grantedCount, totalCount),
+            style = MaterialTheme.typography.bodyMedium,
+            color = colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Chip(filter == AppFilter.All, stringResource(R.string.superuser_filter_all)) {
+                onFilterChange(AppFilter.All)
+            }
+            Chip(filter == AppFilter.Root, "ROOT") { onFilterChange(AppFilter.Root) }
+            Chip(filter == AppFilter.Custom, stringResource(R.string.profile_custom)) {
+                onFilterChange(AppFilter.Custom)
+            }
+            Chip(showSystemApps, stringResource(R.string.superuser_filter_system), onToggleShowSystemApps)
         }
     }
 }

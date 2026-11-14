@@ -460,6 +460,11 @@ fun ModulePagerMaterial(
                 updateInfoMap = uiState.updateInfo,
                 actions = actions,
                 onModuleAddShortcut = { module, type -> onModuleAddShortcut(module, type) },
+                summary = if (uiState.moduleList.isEmpty()) null else stringResource(
+                    R.string.module_summary,
+                    uiState.moduleList.count { it.enabled },
+                    uiState.updateInfo.count { it.value.downloadUrl.isNotBlank() },
+                ),
             )
         }
     }
@@ -490,6 +495,7 @@ private fun ModuleList(
     actions: ModuleActions,
     onModuleAddShortcut: (Module, ShortcutType) -> Unit,
     closeSearch: () -> Unit? = {},
+    summary: String? = null,
 ) {
     val loadingDialog = rememberLoadingDialog()
     LazyColumn(
@@ -502,6 +508,16 @@ private fun ModuleList(
             bottom = 16.dp + bottomInnerPadding + 56.dp + 16.dp
         ),
     ) {
+        if (summary != null) {
+            item(key = "summary", contentType = "summary") {
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
+        }
         items(displayModules, key = { it.id }, contentType = { "module" }) { module ->
             val scope = rememberCoroutineScope()
             val moduleUpdateInfo = updateInfoMap[module.id] ?: ModuleUpdateInfo.Empty

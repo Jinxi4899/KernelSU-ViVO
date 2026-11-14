@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.VolunteerActivism
 import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -89,6 +90,7 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import me.weishu.kernelsu.ui.component.miuix.AppScaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
@@ -110,6 +112,7 @@ fun HomePagerMiuix(
     state: HomeUiState,
     actions: HomeActions,
     bottomInnerPadding: Dp,
+    onOpenThemeStore: () -> Unit = {},
 ) {
     val scrollBehavior = MiuixScrollBehavior()
     val enableBlur = LocalEnableBlur.current
@@ -124,6 +127,7 @@ fun HomePagerMiuix(
                 scrollBehavior = scrollBehavior,
                 backdrop = backdrop,
                 barColor = barColor,
+                onOpenThemeStore = onOpenThemeStore,
             )
         },
         popupHost = { },
@@ -247,11 +251,21 @@ private fun TopBar(
     scrollBehavior: ScrollBehavior,
     backdrop: LayerBackdrop?,
     barColor: Color,
+    onOpenThemeStore: () -> Unit = {},
 ) {
     BlurredBar(backdrop = backdrop, scrollBehavior = scrollBehavior) {
         TopAppBar(
             color = barColor,
             title = customText(CustomTextKey.HOME_TITLE),
+            navigationIcon = {
+                IconButton(onClick = onOpenThemeStore) {
+                    Icon(
+                        imageVector = Icons.Rounded.Storefront,
+                        contentDescription = customText(CustomTextKey.PAGE_THEME_STORE),
+                        tint = colorScheme.onBackground,
+                    )
+                }
+            },
             actions = {
                 RebootListPopupMiuix()
             },

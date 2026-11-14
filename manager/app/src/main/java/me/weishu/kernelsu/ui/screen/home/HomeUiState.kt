@@ -50,11 +50,14 @@ data class HomeUiState(
     val showGkiWarning: Boolean
         get() = ksuVersion != null && lkmMode == false
 
+    // The embedded LKM ships with the manager, so "update available" only makes sense when the
+    // running (bundled) LKM is older than this manager. A newer running LKM must not be reported
+    // as updatable: patching again would silently downgrade it.
     val showLkmUpdate: Boolean
         get() = isManager &&
                 lkmMode == true &&
                 isLkmBundled &&
-                ksuVersion?.toLong() != currentManagerVersionCode &&
+                (ksuVersion?.toLong() ?: 0L) < currentManagerVersionCode &&
                 !requiresNewKernel &&
                 !requiresNewManager
 

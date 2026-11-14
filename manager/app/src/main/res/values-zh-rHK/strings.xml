@@ -35,6 +35,12 @@
     <string name="module_failed_to_enable">無法啟用模組：%s</string>
     <string name="module_failed_to_disable">無法停用模組：%s</string>
     <string name="module_empty">未安裝模組</string>
+    <string name="module_summary">%1$d 個已啟用 · %2$d 個可更新</string>
+    <string name="superuser_granted_summary">已授權 %1$d / %2$d 個應用程式</string>
+    <string name="superuser_filter_all">全部</string>
+    <string name="superuser_filter_system">系統應用程式</string>
+    <string name="splash_tagline">基於核心的 Root 方案</string>
+    <string name="splash_motto">你所喜歡的，你允許；你所允許的，你管理。</string>
     <string name="module">模組</string>
     <string name="module_install_prompt_with_name">將安裝以下模組：%1$s</string>
     <string name="module_sort_action_first">可執行優先</string>
@@ -949,7 +955,8 @@
 <string name="settings_home_card_sticker">狀態卡貼紙</string>
 <string name="theme_export_dialog_message">選擇要寫入此 .sukisu 主題包的項目：</string>
 <string name="theme_package_format_version">主題包格式 v%1$d</string>
-<string name="theme_clear_all">清除全部外觀</string>
+<string name="theme_clear_all">清除全部</string>
+<string name="theme_clear_all_confirm">清除全部</string>
 <string name="theme_clear_all_summary">移除全部背景、狀態卡圖片、貼紙與自訂文字，配色與圖示恢復預設</string>
 <string name="theme_clear_all_confirm_title">清除全部外觀？</string>
 <string name="theme_clear_all_confirm_message">自訂背景、首頁狀態卡背景圖、全部貼紙和自訂文字會被刪除，主題配色、Monet、強調色與應用程式圖示將恢復預設。此操作無法復原。</string>
