@@ -897,6 +897,9 @@ internal fun themeImageRequest(context: android.content.Context, url: String, to
     ImageRequest.Builder(context)
         .data(url)
         .crossfade(true)
+        // The mirror answers a plain GET with a 302 to a separate asset node, while a
+        // ranged request (what the theme downloader already uses) is served directly.
+        .addHeader("Range", "bytes=0-")
         .apply {
             val current = ThemeStoreAccessRepository.currentForUrl(url, token)
             if (current.isNotBlank()) {

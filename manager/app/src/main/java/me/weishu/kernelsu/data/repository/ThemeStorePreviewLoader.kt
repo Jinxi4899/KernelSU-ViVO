@@ -5,6 +5,7 @@ import coil.ImageLoader
 import coil.memory.MemoryCache
 import me.weishu.kernelsu.ksuApp
 import okhttp3.Dispatcher
+import java.util.concurrent.TimeUnit
 
 /**
  * Dedicated Coil loader for theme-store grid previews.
@@ -35,6 +36,11 @@ object ThemeStorePreviewLoader {
         }
         val client = ksuApp.okhttpClient.newBuilder()
             .dispatcher(dispatcher)
+            // Preview stalls must surface quickly: the mirror may answer with a 302 to a
+            // separate asset node that is unreachable.
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(8, TimeUnit.SECONDS)
+            .callTimeout(12, TimeUnit.SECONDS)
             .build()
         return ImageLoader.Builder(context)
             // A separate loader has its own memory cache; keep it small since the

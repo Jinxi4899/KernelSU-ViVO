@@ -166,13 +166,24 @@ endif
 # Calculate version if git version is available
 ifdef KSU_GIT_VERSION_VALID
 # ksu_version: major * 10000 + git version + 200 for historical reasons
+# An explicit KSU_VERSION passed on the command line wins over the git count,
+# which is what in-tree integrators and release rebuilds rely on.
 $(eval KSU_VERSION=$(shell expr 30000 + $(KSU_GIT_VERSION)))
 $(info -- KernelSU version: $(KSU_VERSION))
 ccflags-y += -DKSU_VERSION=$(KSU_VERSION)
 else
-# If there is no .git directory, use default version
+# If there is no .git directory (zip download, in-tree copy without metadata),
+# fall back to the base of the 30000-based version scheme instead of the
+# legacy upstream value 16. Module installers such as Zygisk Next require
+# kernel version >= 10940 and abort with "KernelSU version is too old" when a
+# git-less build reports 16. 30000 also stays below any manager build
+# (30000 + commit count), so the manager still offers the LKM update.
+# Builders may pass an explicit version with: make KSU_VERSION=<n>
+KSU_VERSION ?= 30000
 $(warning "KSU_GIT_VERSION not defined! It is better to make KernelSU a git repository!")
-ccflags-y += -DKSU_VERSION=16
+$(warning "KernelSU version fallback: $(KSU_VERSION) (override with make KSU_VERSION=<n>)")
+$(info -- KernelSU version: $(KSU_VERSION) (fallback))
+ccflags-y += -DKSU_VERSION=$(KSU_VERSION)
 endif
 
 KSU_NEW_DCACHE_FLUSH := $(shell grep -q __flush_dcache_area $(srctree)/arch/arm64/include/asm/cacheflush.h ; echo $$?)

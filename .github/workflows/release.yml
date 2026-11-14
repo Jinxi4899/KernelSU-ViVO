@@ -10,13 +10,29 @@ permissions:
   contents: write
 
 jobs:
+  check-tag:
+    # Fail fast when the tag already belongs to a published (immutable) release instead of
+    # burning a full build and dying at the upload step.
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Ensure the release tag is unused
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ inputs.tag }}" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "::error::Release '${{ inputs.tag }}' already exists. Reused tags are rejected by immutable releases; pick a new tag."
+            exit 1
+          fi
+
   build-manager:
+    needs: [check-tag]
     uses: ./.github/workflows/build-manager.yml
     with:
       version_name: ${{ inputs.tag }}
     secrets: inherit
   release:
     needs:
+      - check-tag
       - build-manager
     runs-on: ubuntu-24.04
     steps:
