@@ -84,12 +84,14 @@ fun HomePager(
             state = uiState,
             actions = actions,
             bottomInnerPadding = bottomInnerPadding,
+            onOpenThemeStore = { navigator.push(Route.ThemeStore()) },
         )
 
         UiMode.Material -> HomePagerMaterial(
             state = uiState,
             actions = actions,
             bottomInnerPadding = bottomInnerPadding,
+            onOpenThemeStore = { navigator.push(Route.ThemeStore()) },
         )
     }
 }

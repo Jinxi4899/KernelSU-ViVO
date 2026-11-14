@@ -39,6 +39,12 @@
     <string name="module_failed_to_enable">Failed to enable module: %s</string>
     <string name="module_failed_to_disable">Failed to disable module: %s</string>
     <string name="module_empty">No module installed</string>
+    <string name="module_summary">%1$d enabled · %2$d updatable</string>
+    <string name="superuser_granted_summary">%1$d of %2$d apps granted</string>
+    <string name="superuser_filter_all">All</string>
+    <string name="superuser_filter_system">System</string>
+    <string name="splash_tagline">Kernel-based Root Solution</string>
+    <string name="splash_motto">What you like, you permit; what you permit, you govern.</string>
     <string name="module">Module</string>
     <string name="module_install_prompt_with_name">The following modules will be installed: %1$s</string>
     <string name="module_sort_action_first">Action first</string>
@@ -798,6 +804,7 @@
 <string name="theme_reset">Restore Defaults</string>
 <string name="theme_reset_summary">Reset card opacity, background blur and scrim</string>
 <string name="theme_clear_all">Clear all appearance</string>
+<string name="theme_clear_all_confirm">Clear all</string>
 <string name="theme_clear_all_summary">Remove every background, status card image, sticker and custom text, and restore colors and icon</string>
 <string name="theme_clear_all_confirm_title">Clear all appearance?</string>
 <string name="theme_clear_all_confirm_message">The custom background, home status card image, all stickers and custom texts will be deleted. Theme colors, Monet, key color and the app icon will return to their defaults. This cannot be undone.</string>

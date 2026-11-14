@@ -847,6 +847,30 @@ class SettingsViewModel(
         }
     }
 
+    /**
+     * Restores the background appearance knobs only, matching the source manager's reset action.
+     * Theme colors, dynamic color and the custom background image are user choices and stay.
+     */
+    fun resetBackgroundAppearance() {
+        ThemeTrialManager.clear(ksuApp)
+        val defaultBlur = ImageStorage.defaultBackgroundBlurPercent(ksuApp)
+        repo.cardBackgroundAlphaPercent = ImageStorage.DEFAULT_CARD_ALPHA
+        repo.customBackgroundBlurPercent = defaultBlur
+        repo.customBackgroundScrimPercent = ImageStorage.DEFAULT_BACKGROUND_SCRIM
+        repo.hideHomeCardStatusText = false
+        repo.hideHomeCardDecoration = false
+        _uiState.update {
+            it.copy(
+                cardBackgroundAlphaPercent = ImageStorage.DEFAULT_CARD_ALPHA,
+                customBackgroundBlurPercent = defaultBlur,
+                customBackgroundScrimPercent = ImageStorage.DEFAULT_BACKGROUND_SCRIM,
+                hideHomeCardStatusText = false,
+                hideHomeCardDecoration = false,
+            )
+        }
+        toast(R.string.theme_reset_done)
+    }
+
     fun restoreDefaultTheme() {
         viewModelScope.launch {
             packages.restoreDefault()

@@ -3,7 +3,10 @@
     <color name="ic_launcher_background">#FFFFFFFF</color>
     <color name="ic_launcher_background_alt">#FF334155</color>
     <color name="ic_launcher_background_logo">#FF0F766E</color>
-    <color name="ic_launcher_background_zako">#FFF97316</color>
+    <color name="ic_launcher_background_zako">#FFEA580C</color>
     <color name="ic_launcher_foreground">#FF1E110D</color>
+    <color name="ic_launcher_foreground_alt">#FFF8FAFC</color>
+    <color name="ic_launcher_foreground_logo">#FFF0FDFA</color>
+    <color name="ic_launcher_foreground_zako">#FFFFF7ED</color>
     <color name="ic_splash_background">#FFF5F5F5</color>
 </resources>

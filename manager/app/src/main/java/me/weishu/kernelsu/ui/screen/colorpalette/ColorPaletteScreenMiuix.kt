@@ -1422,7 +1422,7 @@ fun ColorPaletteScreenMiuix(
                             text = stringResource(R.string.theme_reset),
                             onClick = {
                                 showResetDialog = false
-                                settingsViewModel.restoreDefaultTheme()
+                                settingsViewModel.resetBackgroundAppearance()
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.textButtonColorsPrimary(),
@@ -1447,7 +1447,7 @@ fun ColorPaletteScreenMiuix(
                         )
                         Spacer(Modifier.width(20.dp))
                         TextButton(
-                            text = stringResource(R.string.theme_clear_all),
+                            text = stringResource(R.string.theme_clear_all_confirm),
                             onClick = {
                                 showClearAllDialog = false
                                 settingsViewModel.restoreDefaultTheme()

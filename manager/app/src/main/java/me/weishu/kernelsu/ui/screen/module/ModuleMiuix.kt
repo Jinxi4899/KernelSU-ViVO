@@ -546,6 +546,11 @@ fun ModulePagerMiuix(
                             },
                             contentPadding = contentPadding,
                             listState = listState,
+                            summary = if (uiState.moduleList.isEmpty()) null else stringResource(
+                                R.string.module_summary,
+                                uiState.moduleList.count { it.enabled },
+                                uiState.updateInfo.count { it.value.downloadUrl.isNotBlank() },
+                            ),
                         )
                     }
                 }
@@ -699,6 +704,7 @@ private fun ModuleList(
     onModuleAddShortcut: (Module, ShortcutType) -> Unit,
     contentPadding: PaddingValues,
     listState: LazyListState = rememberLazyListState(),
+    summary: String? = null,
 ) {
     val loadingDialog = rememberLoadingDialog()
     val scope = rememberCoroutineScope()
@@ -708,6 +714,16 @@ private fun ModuleList(
         contentPadding = contentPadding,
         overscrollEffect = null,
     ) {
+        if (summary != null) {
+            item(key = "summary", contentType = "summary") {
+                Text(
+                    text = summary,
+                    modifier = Modifier.padding(start = 28.dp, end = 16.dp, bottom = 10.dp),
+                    fontSize = 14.sp,
+                    color = colorScheme.onSurfaceVariantSummary,
+                )
+            }
+        }
         items(
             items = modules,
             key = { it.id },

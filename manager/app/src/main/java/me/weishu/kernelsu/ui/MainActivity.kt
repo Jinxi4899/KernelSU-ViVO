@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.os.SystemClock
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -84,6 +83,7 @@ import me.weishu.kernelsu.ui.component.bottombar.NavigationBadgeState
 import me.weishu.kernelsu.ui.component.bottombar.SideRail
 import me.weishu.kernelsu.ui.component.bottombar.rememberMainPagerState
 import me.weishu.kernelsu.ui.component.bottombar.useNavigationRail
+import me.weishu.kernelsu.ui.component.splash.SplashScreen
 import me.weishu.kernelsu.ui.navigation3.IntentDispatcher
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Navigator
@@ -161,9 +161,6 @@ class MainActivity : ComponentActivity() {
 
     private val intentChannel = Channel<Intent>(capacity = Channel.BUFFERED)
     private var contentReady = false
-    private var splashStartedAt = 0L
-    private val splashAnimationDurationMs = 500L
-
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(MeWeishuLocale.wrap(newBase))
@@ -172,11 +169,11 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
-        splashStartedAt = SystemClock.uptimeMillis()
         super.onCreate(savedInstanceState)
-        splashScreen.setKeepOnScreenCondition {
-            !contentReady || SystemClock.uptimeMillis() - splashStartedAt < splashAnimationDurationMs
-        }
+        // Hand over to the in-app animated splash as soon as the first frame is drawn; the
+        // platform splash icon animation is short (and disabled on some OEM skins), so it must
+        // not be kept on screen as a static image.
+        splashScreen.setKeepOnScreenCondition { !contentReady }
 
         // A trial only lives for the process (and task) that started it; restore the previous
         // appearance before anything else reads the theme settings.
@@ -419,6 +416,12 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    var appContentReady by remember { mutableStateOf(false) }
+                    var splashDismissed by remember { mutableStateOf(false) }
+                    SideEffect {
+                        if (!appContentReady) appContentReady = true
+                    }
+
                     Box(modifier = Modifier.fillMaxSize()) {
                         val hasCustomBackground = uiState.customBackgroundUri.isNotEmpty()
                         val backgroundBlurRadius = (
@@ -489,6 +492,13 @@ class MainActivity : ComponentActivity() {
                                 containerColor = if (hasCustomBackground) Color.Transparent
                                 else MiuixTheme.colorScheme.surface
                             ) { navDisplay() }
+                        }
+
+                        if (!splashDismissed) {
+                            SplashScreen(
+                                isReady = appContentReady,
+                                onDismissed = { splashDismissed = true },
+                            )
                         }
                     }
                     SideEffect { contentReady = true }
