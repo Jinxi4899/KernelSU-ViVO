@@ -1,6 +1,5 @@
 package me.weishu.kernelsu.ui.component.splash
 
-import android.graphics.drawable.Animatable
 import android.widget.ImageView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -166,7 +165,7 @@ fun SplashScreen(
                                             setImageDrawable(drawable)
                                             // Start after the view is attached so the drawable's
                                             // bounds are known and the animation is not dropped.
-                                            post { (drawable as? Animatable)?.start() }
+                                            post { (drawable as? android.graphics.drawable.Animatable)?.start() }
                                         }
                                 }
                             },
