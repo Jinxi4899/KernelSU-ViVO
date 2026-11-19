@@ -377,11 +377,11 @@
 <string name="background_crop_gallery_failed">相簿未傳回圖片</string>
 <string name="background_crop_prepare_failed">無法讀取所選圖片</string>
 <string name="settings_card_background_alpha">卡片不透明度</string>
-<string name="settings_card_background_alpha_summary">調節背景卡片不透明度（%d%%）</string>
+<string name="settings_card_background_alpha_summary">調節背景卡片不透明度</string>
 <string name="settings_background_blur">背景模糊</string>
-<string name="settings_background_blur_summary">調節自定義背景的模糊程度（%d%%）</string>
+<string name="settings_background_blur_summary">調節自定義背景的模糊程度</string>
 <string name="settings_background_scrim">背景遮罩</string>
-<string name="settings_background_scrim_summary">調節背景遮罩的明暗（%d%%）</string>
+<string name="settings_background_scrim_summary">調節背景遮罩的明暗</string>
 <string name="theme_preview_caption_miuix">預覽 · Miuix</string>
 <string name="theme_preview_caption_material">預覽 · Material 3 Expressive</string>
 <string name="theme_preview_description">使用目前主題與背景的首頁預覽</string>
