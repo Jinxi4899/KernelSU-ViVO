@@ -52,6 +52,20 @@ jobs:
         # "LKM update" that changes nothing. Fetch the full history here.
         fetch-depth: 0
 
+    - name: Compute KSU_VERSION
+      id: ksuver
+      run: |
+        set -euo pipefail
+        # Resolve the repo path dynamically: this fork is KernelSU-ViVO, so the
+        # upstream hard-coded /__w/KernelSU/KernelSU never matched and git
+        # refused the checkout as "dubious ownership". Kbuild then failed to
+        # detect a git root and silently fell back to a constant version.
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        COUNT=$(git -C "$GITHUB_WORKSPACE" rev-list --count HEAD)
+        VER=$((30000 + COUNT))
+        echo "commit count: $COUNT -> KSU_VERSION: $VER"
+        echo "version=$VER" >> "$GITHUB_OUTPUT"
+
     - name: Inject vivo vermagic
       if: ${{ inputs.vivo }}
       run: |
@@ -106,13 +120,16 @@ jobs:
         EXPECTED_SIZE: ${{ inputs.expected_size }}
         EXPECTED_HASH: ${{ inputs.expected_hash }}
       run: |
-        git config --global --add safe.directory /__w/KernelSU/KernelSU
+        set -eo pipefail
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
         cd kernel
 
         echo "=== Building kernelsu.ko for KMI: ${{ inputs.kmi }} ==="
 
         EXTRA_ARGS=""
+        KSU_VER="${{ steps.ksuver.outputs.version }}"
+        EXTRA_ARGS="$EXTRA_ARGS KSU_VERSION=$KSU_VER"
         if [ -n "$EXPECTED_SIZE" ] && [ -z "$EXPECTED_HASH" ]; then
           echo "ERROR: expected_hash must be provided when expected_size is set."
           exit 1
@@ -133,7 +150,18 @@ jobs:
         if [ -n "$PACKAGE_NAME" ]; then
           EXTRA_ARGS="$EXTRA_ARGS KSU_PACKAGE_NAME=$PACKAGE_NAME"
         fi
-        CONFIG_KSU=m CC=clang make $EXTRA_ARGS
+        CONFIG_KSU=m CC=clang make $EXTRA_ARGS 2>&1 | tee /tmp/ksu-build.log
+
+        # Fail loudly instead of shipping a module that silently fell back to a
+        # placeholder version: module installers such as Zygisk Next reject
+        # anything below 10940 with "KernelSU version is too old".
+        # Kbuild prints the origin after the number, so match the prefix only.
+        if ! grep -q -- "-- KernelSU version: ${KSU_VER}" /tmp/ksu-build.log; then
+          echo "ERROR: Kbuild did not report KSU_VERSION=${KSU_VER}, the version fell back."
+          grep -- "-- KernelSU version" /tmp/ksu-build.log || true
+          exit 1
+        fi
+        echo "Verified: kernelsu.ko reports KSU_VERSION=${KSU_VER}"
         
         echo "=== Build completed ==="
 
@@ -168,6 +196,7 @@ jobs:
         EXPECTED_SIZE: ${{ inputs.expected_size }}
         EXPECTED_HASH: ${{ inputs.expected_hash }}
       run: |
+        set -o pipefail
         cd kernel
         make clean
 
@@ -203,6 +232,8 @@ jobs:
         echo "=== Building x64 kernelsu.ko for KMI: ${{ inputs.kmi }} ==="
 
         EXTRA_ARGS=""
+        KSU_VER="${{ steps.ksuver.outputs.version }}"
+        EXTRA_ARGS="$EXTRA_ARGS KSU_VERSION=$KSU_VER"
         if [ -n "$EXPECTED_SIZE" ] && [ -z "$EXPECTED_HASH" ]; then
           echo "ERROR: expected_hash must be provided when expected_size is set."
           exit 1
@@ -227,10 +258,18 @@ jobs:
         MDIR=$(realpath .)
 
         if [ "$kmi" == "android17-6.18" ]; then
-          make -C $KDIR M=$MDIR MO=$MDIR compile_commands.json modules CONFIG_KSU=m CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER=y $EXTRA_ARGS
+          make -C $KDIR M=$MDIR MO=$MDIR compile_commands.json modules CONFIG_KSU=m CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER=y $EXTRA_ARGS 2>&1 | tee /tmp/ksu-build-x64.log
         else
-          make -C $KDIR M=$MDIR src=$MDIR compile_commands.json modules CONFIG_KSU=m CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER=y $EXTRA_ARGS
+          make -C $KDIR M=$MDIR src=$MDIR compile_commands.json modules CONFIG_KSU=m CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER=y $EXTRA_ARGS 2>&1 | tee /tmp/ksu-build-x64.log
         fi
+
+        # Kbuild prints the origin after the number, so match the prefix only.
+        if ! grep -q -- "-- KernelSU version: ${KSU_VER}" /tmp/ksu-build-x64.log; then
+          echo "ERROR: Kbuild did not report KSU_VERSION=${KSU_VER}, the version fell back."
+          grep -- "-- KernelSU version" /tmp/ksu-build-x64.log || true
+          exit 1
+        fi
+        echo "Verified: x64 kernelsu.ko reports KSU_VERSION=${KSU_VER}"
         
         echo "=== Build completed ==="
 

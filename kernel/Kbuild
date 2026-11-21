@@ -144,18 +144,30 @@ MDIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # Workaround bazel
 # https://github.com/tiann/KernelSU/pull/316#issuecomment-1479043219
 GIT := $(shell PATH="$$PATH":/usr/bin:/usr/local/bin which git)
+
+# git refuses to read a repository owned by another user ("dubious ownership").
+# That is the normal case inside CI containers, where the checkout and the build
+# run as different users. Upstream whitelisted one hard-coded repository path,
+# which silently breaks every fork whose repository name differs: the lookup
+# fails, the version falls back to a constant, and the resulting module reports
+# a version that module installers reject. Always trust the tree we are building.
+GIT_SAFE := -c "safe.directory=*"
+
 ifneq ($(GIT),)
 # Check if this is a git repository
 # Try to detect Git repo intelligently
-GIT_ROOT := $(shell cd $(MDIR) && $(GIT) rev-parse --show-toplevel 2>/dev/null)
+GIT_ROOT := $(shell cd $(MDIR) && $(GIT) $(GIT_SAFE) rev-parse --show-toplevel 2>/dev/null)
 ifneq ($(GIT_ROOT),)
-KERNEL_GIT_ROOT := $(shell cd $(srctree) && $(GIT) rev-parse --show-toplevel 2>/dev/null)
+KERNEL_GIT_ROOT := $(shell cd $(srctree) && $(GIT) $(GIT_SAFE) rev-parse --show-toplevel 2>/dev/null)
 ifneq ($(GIT_ROOT),$(KERNEL_GIT_ROOT))
-# Only set version if it's a different repo from kernel
+# Only set version if it's a different repo from kernel, otherwise the commit
+# count would be the kernel's history instead of ours.
 $(shell cd $(GIT_ROOT) && [ -f .git/shallow ] && $(GIT) fetch --unshallow 2>/dev/null || true)
-KSU_GIT_VERSION := $(shell cd $(GIT_ROOT) && $(GIT) rev-list --count HEAD 2>/dev/null)
+KSU_GIT_VERSION := $(shell cd $(GIT_ROOT) && $(GIT) $(GIT_SAFE) rev-list --count HEAD 2>/dev/null)
+ifneq ($(KSU_GIT_VERSION),)
 KSU_GIT_VERSION_VALID := 1
 $(info -- KernelSU: Git repo detected at $(GIT_ROOT))
+endif
 endif
 endif
 else
@@ -163,28 +175,35 @@ $(warning -- KernelSU: Git not detected, make sure git is installed in your PATH
 endif
 
 
-# Calculate version if git version is available
+# Calculate version: git commit count if available, else a checked-in
+# kernel/ksu_version, else an explicit KSU_VERSION, else fail loudly.
+#
+# There is deliberately no silent default here. A wrong version is worse than a
+# failed build: module installers such as Zygisk Next abort with "KernelSU
+# version is too old" below 10940, and a too-high constant makes them abort with
+# "KernelSU version abnormal". Builders can always pass KSU_VERSION=<n>.
 ifdef KSU_GIT_VERSION_VALID
-# ksu_version: major * 10000 + git version + 200 for historical reasons
-# An explicit KSU_VERSION passed on the command line wins over the git count,
-# which is what in-tree integrators and release rebuilds rely on.
-$(eval KSU_VERSION=$(shell expr 30000 + $(KSU_GIT_VERSION)))
-$(info -- KernelSU version: $(KSU_VERSION))
+KSU_VERSION ?= $(shell expr 30000 + $(KSU_GIT_VERSION))
+$(info -- KernelSU version: $(KSU_VERSION) (git commit count: $(KSU_GIT_VERSION)))
+ccflags-y += -DKSU_VERSION=$(KSU_VERSION)
+else ifneq ($(wildcard $(MDIR)/ksu_version),)
+KSU_VERSION ?= $(shell cat $(MDIR)/ksu_version)
+$(info -- KernelSU version: $(KSU_VERSION) (from $(MDIR)/ksu_version))
+ccflags-y += -DKSU_VERSION=$(KSU_VERSION)
+else ifdef KSU_VERSION
+$(info -- KernelSU version: $(KSU_VERSION) (explicit))
+ccflags-y += -DKSU_VERSION=$(KSU_VERSION)
+else ifneq ($(filter clean mrproper distclean help menuconfig nconfig xconfig gconfig oldconfig olddefconfig defconfig savedefconfig syncconfig,$(MAKECMDGOALS)),)
+# Never block housekeeping or configuration targets.
+$(info -- KernelSU version: skipped for $(MAKECMDGOALS))
+else ifeq ($(KSU_ALLOW_VERSION_FALLBACK),1)
+KSU_VERSION ?= 30000
+$(warning -- KernelSU: KSU_VERSION forced to $(KSU_VERSION) by KSU_ALLOW_VERSION_FALLBACK=1)
 ccflags-y += -DKSU_VERSION=$(KSU_VERSION)
 else
-# If there is no .git directory (zip download, in-tree copy without metadata),
-# fall back to the base of the 30000-based version scheme instead of the
-# legacy upstream value 16. Module installers such as Zygisk Next require
-# kernel version >= 10940 and abort with "KernelSU version is too old" when a
-# git-less build reports 16. 30000 also stays below any manager build
-# (30000 + commit count), so the manager still offers the LKM update.
-# Builders may pass an explicit version with: make KSU_VERSION=<n>
-KSU_VERSION ?= 30000
-$(warning "KSU_GIT_VERSION not defined! It is better to make KernelSU a git repository!")
-$(warning "KernelSU version fallback: $(KSU_VERSION) (override with make KSU_VERSION=<n>)")
-$(info -- KernelSU version: $(KSU_VERSION) (fallback))
-ccflags-y += -DKSU_VERSION=$(KSU_VERSION)
+$(error KernelSU: cannot determine KSU_VERSION: no git metadata and no $(MDIR)/ksu_version. Build with `make KSU_VERSION=<n>`, or write the number into $(MDIR)/ksu_version, or set KSU_ALLOW_VERSION_FALLBACK=1 to build with 30000. Refusing to compile a module that would report a placeholder version.)
 endif
+
 
 KSU_NEW_DCACHE_FLUSH := $(shell grep -q __flush_dcache_area $(srctree)/arch/arm64/include/asm/cacheflush.h ; echo $$?)
 $(info -- KSU_NEW_DCACHE_FLUSH: $(KSU_NEW_DCACHE_FLUSH))
@@ -195,8 +214,13 @@ KSU_PACKAGE_NAME ?= me.weishu.kernelsu
 else
 KSU_PACKAGE_NAME ?= me.weishu.kernelsu.pr
 endif
-KSU_EXPECTED_SIZE ?= 0x033b
-KSU_EXPECTED_HASH ?= c371061b19d8c7d7d6133c6a9bafe198fa944e50c1b31c9d8daa8d7f1fc2d2d6
+# Certificate of this project's release keystore (DER length 865 bytes),
+# extracted from ViVo-KernelSU_1.0.3_32733 and 1.0.4_32740 (both share it).
+# Upstream's values were kept here before, which meant a locally built LKM
+# refused to crown this Manager. CI overrides both with the values of the APK
+# it actually signed, so PR builds keep working.
+KSU_EXPECTED_SIZE ?= 0x0361
+KSU_EXPECTED_HASH ?= be5a88afbb95657c4caa9c8a7eb2856d62e9c55a98a2aab86be7450cd251e295
 
 $(info -- KernelSU Manager package name: $(KSU_PACKAGE_NAME))
 $(info -- KernelSU Manager signature size: $(KSU_EXPECTED_SIZE))
